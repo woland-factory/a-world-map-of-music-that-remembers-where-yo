@@ -1,0 +1,14 @@
+node_modules/
+dist/
+web/public/data/
+.env
+*.log
+test-results/
+playwright-report/
+.vite/
+
+# Run context (never committed)
+result.json
+compose.critique.yml
+CLAUDE.md
+.claude/

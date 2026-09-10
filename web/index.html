@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=5.0"
+    />
+    <title>A world map of music</title>
+    <meta
+      name="description"
+      content="A map of every music genre. The places you explore light up."
+    />
+    <!-- Runtime config. In the container the entrypoint regenerates this
+         from environment variables before nginx starts. -->
+    <script src="/env.js"></script>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main id="app">
+      <canvas
+        id="map"
+        role="img"
+        aria-label="A map of music genres. Loading."
+      ></canvas>
+
+      <!-- Skeleton: holds the layout steady while the atlas loads. -->
+      <div id="skeleton" class="overlay" aria-hidden="false">
+        <div class="skeleton-field"></div>
+        <p class="skeleton-caption">Charting the atlas of music.</p>
+      </div>
+
+      <!-- Error: shown only if the atlas fails to load. -->
+      <div id="error" class="overlay" hidden>
+        <div class="card">
+          <h1>Let's try that again</h1>
+          <p>Check your connection and reload the map.</p>
+          <button id="reload" type="button" class="primary">Reload</button>
+        </div>
+      </div>
+
+      <!-- First-run orientation: shown once, then never again. -->
+      <div id="orientation" class="orientation" hidden>
+        <div class="card">
+          <p class="lead">A map of every music genre. The places you explore light up.</p>
+          <p class="hint">Drag to explore. Pinch to zoom.</p>
+          <button id="got-it" type="button" class="primary">Got it</button>
+        </div>
+      </div>
+
+      <!-- Map controls. -->
+      <div id="controls" class="controls" hidden>
+        <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+        <button id="zoom-out" type="button" aria-label="Zoom out">&minus;</button>
+        <button id="reset-view" type="button" aria-label="Reset view">
+          <span aria-hidden="true">&#9678;</span>
+        </button>
+      </div>
+
+      <!-- Region legend (accessible DOM, not canvas-only). -->
+      <aside id="legend" class="legend" hidden>
+        <button id="legend-toggle" type="button" aria-expanded="true" aria-controls="legend-list">
+          Regions
+        </button>
+        <ul id="legend-list"></ul>
+      </aside>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

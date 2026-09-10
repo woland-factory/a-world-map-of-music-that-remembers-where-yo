@@ -1,0 +1,6 @@
+{"mbid":"11111111-0000-0000-0000-000000000001","name":"black metal","weights":{"death metal":8,"thrash metal":5}}
+{"mbid":"22222222-0000-0000-0000-000000000002","name":"death metal","weights":{"black metal":8,"thrash metal":6}}
+{"mbid":"33333333-0000-0000-0000-000000000003","name":"thrash metal","weights":{"death metal":6,"black metal":5}}
+{"mbid":"44444444-0000-0000-0000-000000000004","name":"jazz","weights":{"blues":7,"bebop":6}}
+{"mbid":"55555555-0000-0000-0000-000000000005","name":"blues","weights":{"jazz":7,"bebop":3}}
+{"mbid":"66666666-0000-0000-0000-000000000006","name":"bebop","weights":{"jazz":6,"blues":3}}

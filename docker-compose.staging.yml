@@ -1,0 +1,31 @@
+# Factory staging deploy. The shared proxy forwards
+# <slug>.staging.<host> to this container by name on the external network.
+name: a-world-map-of-music-that-remembers-where-yo-staging
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: a-world-map-of-music-that-remembers-where-yo-staging-web
+    expose:
+      - "80"
+    environment:
+      SEED_DEMO: "1"
+      SENTRY_DSN: "${SENTRY_DSN:-}"
+      UMAMI_URL: "${UMAMI_URL:-}"
+      UMAMI_WEBSITE_ID: "${UMAMI_WEBSITE_ID:-}"
+    networks:
+      - default
+      - staging
+    mem_limit: 512m
+    oom_score_adj: 800
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+networks:
+  staging:
+    external: true
+    name: factory-staging-net

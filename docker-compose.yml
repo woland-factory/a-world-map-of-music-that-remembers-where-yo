@@ -1,0 +1,23 @@
+# Local / self-host run. Builds the static app and serves it on
+# http://127.0.0.1:8080. SEED_DEMO defaults on so a fresh open shows the
+# partly-lit demo map; set SEED_DEMO=0 to start dark.
+name: world-map-of-music
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:8080:80"
+    environment:
+      SEED_DEMO: "${SEED_DEMO:-1}"
+      SENTRY_DSN: "${SENTRY_DSN:-}"
+      UMAMI_URL: "${UMAMI_URL:-}"
+      UMAMI_WEBSITE_ID: "${UMAMI_WEBSITE_ID:-}"
+    mem_limit: 256m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

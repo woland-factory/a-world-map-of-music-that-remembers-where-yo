@@ -1,0 +1,251 @@
+:root {
+  --bg: #0a0c10;
+  --panel: rgba(18, 22, 30, 0.92);
+  --border: rgba(148, 163, 184, 0.22);
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #4fc3f7;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* The hidden attribute must win over the display rules below. */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+#map:active {
+  cursor: grabbing;
+}
+#map:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Overlays: skeleton and error hold the full frame. */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: var(--bg);
+  z-index: 10;
+}
+
+.skeleton-field {
+  width: min(70vw, 320px);
+  height: min(70vw, 320px);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(79, 195, 247, 0.10), transparent 60%),
+    radial-gradient(circle at 70% 65%, rgba(186, 104, 200, 0.10), transparent 60%),
+    #12161e;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.skeleton-caption {
+  color: var(--muted);
+  font-size: 15px;
+  letter-spacing: 0.01em;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-field {
+    animation: none;
+  }
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+  max-width: min(88vw, 340px);
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+.card h1 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+.card p {
+  margin: 0 0 16px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.card .lead {
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 600;
+}
+.card .hint {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+button.primary {
+  appearance: none;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #06222e;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 12px 20px;
+  min-height: 44px;
+  cursor: pointer;
+}
+button.primary:hover {
+  filter: brightness(1.08);
+}
+
+/* First-run orientation: a light card near the bottom. It clears the
+   zoom controls at bottom-right so they stay tappable on a phone. */
+.orientation {
+  position: absolute;
+  left: 12px;
+  right: 76px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  z-index: 9;
+}
+.orientation .card {
+  max-width: none;
+}
+
+/* Zoom + reset controls, bottom-right, each >=44px. */
+.controls {
+  position: absolute;
+  right: calc(env(safe-area-inset-right, 0px) + 14px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 10;
+}
+.controls button {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.controls button:hover {
+  border-color: var(--accent);
+}
+
+/* Region legend, top-left. */
+.legend {
+  position: absolute;
+  left: calc(env(safe-area-inset-left, 0px) + 14px);
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  z-index: 8;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 10px;
+  max-width: 46vw;
+  backdrop-filter: blur(8px);
+}
+.legend button {
+  appearance: none;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 4px 2px;
+  width: 100%;
+  text-align: left;
+}
+.legend ul {
+  list-style: none;
+  margin: 6px 0 2px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 42vh;
+  overflow-y: auto;
+}
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.legend .swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex: none;
+}
+
+:where(button, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (min-width: 700px) {
+  .card {
+    max-width: 380px;
+  }
+  .legend {
+    max-width: 240px;
+  }
+  .orientation {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(92vw, 380px);
+  }
+}

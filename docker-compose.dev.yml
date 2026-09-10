@@ -1,0 +1,13 @@
+# Dev: Vite hot reload against the local source. Binds to 127.0.0.1 only.
+name: world-map-of-music-dev
+services:
+  web:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    mem_limit: 1g

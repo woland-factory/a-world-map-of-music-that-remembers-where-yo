@@ -1,0 +1,32 @@
+{
+  "name": "world-map-of-music",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A living map of every music genre. The places you explore light up.",
+  "scripts": {
+    "dev": "node scripts/copy-data.mjs && vite",
+    "build": "node scripts/copy-data.mjs && vite build",
+    "preview": "vite preview",
+    "start": "vite preview",
+    "build:atlas": "tsx pipeline/index.ts all",
+    "atlas:fetch": "tsx pipeline/index.ts genres relations cooccurrence",
+    "atlas:emit": "tsx pipeline/index.ts graph layout cluster emit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "graphology": "^0.25.4",
+    "graphology-communities-louvain": "^2.0.2",
+    "graphology-layout-forceatlas2": "^0.10.1"
+  }
+}
