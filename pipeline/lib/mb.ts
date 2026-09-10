@@ -2,7 +2,7 @@
 // with a descriptive User-Agent built from an env contact.
 
 const BASE = "https://musicbrainz.org/ws/2";
-const MIN_INTERVAL_MS = 1200; // stay comfortably under 1 req/s
+const MIN_INTERVAL_MS = 1500; // stay comfortably under 1 req/s
 
 let lastRequest = 0;
 let requestCount = 0;

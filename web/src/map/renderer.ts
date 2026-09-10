@@ -44,10 +44,17 @@ export class MapRenderer {
       s.n += 1;
       sums.set(g.region, s);
     }
-    return this.atlas.regions.map((r) => {
-      const s = sums.get(r.id) ?? { x: 0, y: 0, n: 1 };
-      return { region: r.id, x: s.x / s.n, y: s.y / s.n, label: r.label };
-    });
+    // Only label regions large enough to read as a neighborhood, biggest
+    // first, so a zoomed-out map shows a few anchors instead of a wall of
+    // overlapping names.
+    return this.atlas.regions
+      .map((r) => {
+        const s = sums.get(r.id) ?? { x: 0, y: 0, n: 1 };
+        return { region: r.id, x: s.x / s.n, y: s.y / s.n, label: r.label, size: s.n };
+      })
+      .filter((r) => r.size >= 4)
+      .sort((a, b) => b.size - a.size)
+      .slice(0, 10);
   }
 
   setLit(lit: Set<number>): void {
@@ -183,15 +190,22 @@ export class MapRenderer {
 
   private drawRegionLabels(): void {
     const ctx = this.ctx;
-    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.font = "600 14px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+    const placed: { x: number; y: number }[] = [];
     for (const c of this.regionCentroids) {
       const sx = this.toScreenX(c.x);
       const sy = this.toScreenY(c.y);
       if (sx < 0 || sx > this.cssW || sy < 0 || sy > this.cssH) continue;
-      ctx.fillStyle = "rgba(226,232,240,0.82)";
+      if (placed.some((p) => Math.abs(p.x - sx) < 90 && Math.abs(p.y - sy) < 18)) continue;
+      placed.push({ x: sx, y: sy });
+      // Shadow so the name reads over the dot field.
+      ctx.shadowBlur = 6;
+      ctx.shadowColor = "rgba(0,0,0,0.9)";
+      ctx.fillStyle = "rgba(233,238,246,0.92)";
       ctx.fillText(c.label, sx, sy);
+      ctx.shadowBlur = 0;
     }
   }
 

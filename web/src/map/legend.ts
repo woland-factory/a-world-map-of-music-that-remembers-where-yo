@@ -7,9 +7,10 @@ export function renderLegend(atlas: Atlas, root: HTMLElement, list: HTMLUListEle
   const counts = new Map<number, number>();
   for (const g of atlas.genres) counts.set(g.region, (counts.get(g.region) ?? 0) + 1);
 
-  const regions = [...atlas.regions].sort(
-    (a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0),
-  );
+  // Show only regions big enough to read as a neighborhood, largest first.
+  const regions = [...atlas.regions]
+    .filter((r) => (counts.get(r.id) ?? 0) >= 4)
+    .sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0));
 
   list.replaceChildren();
   for (const r of regions.slice(0, 12)) {
