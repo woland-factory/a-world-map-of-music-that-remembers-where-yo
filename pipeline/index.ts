@@ -1,6 +1,8 @@
 import { fetchGenres } from "./fetch-genres.js";
 import { fetchRelations } from "./fetch-relations.js";
 import { fetchCooccurrence } from "./fetch-cooccurrence.js";
+import { fetchExemplars } from "./fetch-exemplars.js";
+import { emitExemplars } from "./emit-exemplars.js";
 import { emit } from "./emit.js";
 
 // Orchestrator. Fetch stages hit the network (rate-limited, resumable);
@@ -19,6 +21,10 @@ const STAGES: Record<string, () => void | Promise<void>> = {
   layout: () => void emit(),
   cluster: () => void emit(),
   emit: () => void emit(),
+  // Exemplars: an independent pipeline (iTunes previews) kept separate from
+  // the atlas build so rebuilding one never triggers the other.
+  exemplars: fetchExemplars,
+  "emit-exemplars": () => void emitExemplars(),
 };
 
 const FULL = ["genres", "relations", "cooccurrence", "emit"];

@@ -14,6 +14,8 @@ export const paths = {
   genresCache: join(CACHE_DIR, "genres.json"),
   cooccurrence: join(CACHE_DIR, "cooccurrence.jsonl"),
   relations: join(CACHE_DIR, "relations.jsonl"),
+  exemplars: join(CACHE_DIR, "exemplars.jsonl"),
   atlas: join(DATA_DIR, "genres.json"),
+  exemplarsFile: join(DATA_DIR, "exemplars.json"),
   demoPassport: join(DATA_DIR, "demo-passport.json"),
 };

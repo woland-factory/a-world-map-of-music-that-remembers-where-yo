@@ -1,34 +1,49 @@
-# EPIC SPEC — The genre atlas, and the staging scaffold
+# EPIC SPEC — Hear it, stamp it (the passport)
 
 ## What this EPIC proves
 
-This is the foundation bet. Build the offline pipeline that turns open
-MusicBrainz data into a committed `data/genres.json` (every genre with 2-D
-coordinates, an adjacency list, and a region cluster), render it as a
-pannable, zoomable, dark-by-default map, and stand up the staging deploy
-scaffold. The single question this EPIC answers, with eyes on a real
-screen: **is the layout good enough to build a product on?** Metal
-subgenres must cluster, jazz must border blues, zeuhl must sit near prog
-rock. If the layout is arbitrary after honest iteration, the product
-should be killed here, not dressed up later.
+EPIC 1 shipped the atlas: 2,197 genres laid out as a dark, pannable,
+zoomable map, with lit rendering driven by a passport that only a demo
+seeder could write. This EPIC makes the map **alive and yours**. Two
+things become true for the first time:
+
+1. **You can hear it.** Touch any genre and a 30-second preview plays,
+   sourced from cached iTunes previews resolved offline at build time.
+2. **You can keep it.** Tap Stamp and that genre lights in color, pinned
+   to the track and the day that earned it, saved in the browser and
+   exportable as a file you own.
+
+The signature moment (the zoom-out: your glowing neighborhoods against a
+dark world) becomes reachable through real user action, not a seed. This
+EPIC turns a beautiful read-only map into the durable personal artifact
+the whole product exists to build.
 
 ## Quality differentiator (this app must win here)
 
 **Delight through tactility: an instant, alive map you can hear.** Touch
 anywhere and it plays, your own territory glows out of the dark, and the
-frontier visibly moves when you cross it. Every incumbent is frozen,
-silent, stateless, or a list. We win on the felt experience of a map you
-can hear and a world you are visibly filling in.
+frontier visibly moves when you cross it. Every incumbent (Every Noise,
+musicmap, Music-Map, volt.fm) is frozen, silent, stateless, or a list. We
+win on the felt experience of a map you can hear and a world you are
+visibly filling in.
 
-**What it demands of THIS EPIC:** hearing, stamping, and the dare are
-later EPICs, but the *map itself* is born here, and its feel is the
-whole differentiator. This EPIC owns two of the differentiator's four
-pillars: **instant** (skeleton immediately, real map fast, pan and zoom
-that never stutters on a phone) and **glowing territory out of the dark**
-(lit genres render in color over an unlit dark field, proven on staging
-with a seeded demo passport). A map that loads slowly, janks while
-panning, or reads as a flat list of dots fails the differentiator even if
-every checkbox is green.
+**What it demands of THIS EPIC:** this is the EPIC where the
+differentiator stops being a promise. It owns the two pillars EPIC 1
+could only stage with a fake seed:
+
+- **You can hear it, instantly.** A tap must produce sound with no
+  perceptible wait. The preview URL is already in memory (loaded from a
+  committed data file), playback starts inside the tap gesture, and
+  visual feedback appears within 100ms no matter how fast the audio
+  buffers. A tap that spins, stalls, or needs a network lookup before it
+  plays fails the differentiator even if every checkbox is green.
+- **The frontier moves when you cross it.** Stamping must light the
+  genre in its region color *immediately* (optimistic), and that light
+  must survive a reload. The felt loop is: touch, hear, stamp, watch
+  your corner brighten.
+
+A silent tap, a laggy stamp, or a passport that forgets on reload is a
+differentiator failure, not a minor bug.
 
 ---
 
@@ -36,518 +51,589 @@ every checkbox is green.
 
 ### In scope
 
-1. A committed, offline, **incremental and resumable** build pipeline
-   that ingests MusicBrainz genres, genre-genre relationships, and artist
-   tag co-occurrence, and emits a committed `data/genres.json`.
-2. `data/genres.json`: every MusicBrainz genre with `x`/`y` coordinates,
-   a `neighbors[]` adjacency list, and a `region` id.
-3. A static single-page web app that renders all genres as a dark,
-   pannable, zoomable, labeled map, mobile-first at 390px.
-4. Lit-vs-unlit rendering: genres unlit (dim) by default; a passport (a
-   set of genre ids) makes those genres glow in their region color.
-5. The `SEED_DEMO` affordance that seeds a fixed demo passport so staging
-   shows a partly-lit map within a minute.
-6. Designed loading, error, and first-run orientation states in the
-   product's voice.
-7. The staging deploy scaffold: `Dockerfile`, `docker-compose.staging.yml`,
-   runtime env config, `.env.example` with placeholders only.
-8. `LAYOUT_NOTES.md` recording the eyes test with a screenshot artifact.
-9. `README.md` a stranger can use to clone, configure, and run the app.
+1. **Exemplar pipeline.** A committed, offline, incremental and resumable
+   build stage that resolves **one iTunes preview per genre where one
+   exists** and emits a committed `data/exemplars.json`. Honors a polite
+   iTunes rate (~20 requests/min). Partial coverage is valid and flagged.
+2. **Hear a genre.** Tapping a genre node on the map selects it, plays its
+   30-second preview instantly, and reveals a "now playing" panel with the
+   track and artist. A genre with no exemplar shows an honest resting
+   state, never a broken player.
+3. **Stamp a genre.** An explicit Stamp action lights the genre in its
+   region color immediately (optimistic) and records a stamp with the
+   first-listen date and the track that earned it. Persisted in browser
+   storage; survives reload. A stamp can be removed (the inverse of the
+   core action, so a mis-tap is recoverable).
+4. **The passport view.** A panel listing every stamp with its
+   first-listen date and the track that earned it, a "N of ~2,200 lit"
+   count, a designed empty state, and a one-tap "See your map" that frames
+   the zoom-out signature moment. Works from the first three stamps.
+5. **Export and import.** One click exports the passport as a JSON file
+   the user downloads; import restores it. Passport data never leaves the
+   browser except that downloaded file. Import validates at the boundary.
+6. **Passport v2 data model and migration.** Extend the stored passport
+   from a bare id list to dated stamps with track metadata, migrating any
+   existing v1 passport (and the demo seed) forward without data loss.
+7. Mobile-first, accessible, designed states, copy sweep clean, README
+   and `.env.example` updated for the new pipeline stage.
 
 ### Out of scope (non-goals — binding)
 
-- **No stamping.** There is no user control to record a genre, no
-  tap-to-stamp, no write to the passport from user interaction. The only
-  writer of passport data in this EPIC is the `SEED_DEMO` seeder.
-- **No previews / audio.** No iTunes calls, no players, no `exemplars.json`.
-- **No daily dare.**
-- **No accounts, no login, no backend proxy route.** (The ListenBrainz
-  proxy and `/healthz` app route belong to EPIC 4.) This EPIC's app is
-  static; the only server is the static file server in the compose file.
-- No poster export, no passport view screen, no ListenBrainz.
+- **No daily dare.** No "today's genre", no date-seeded suggestion, no
+  frontier/streak logic. That is EPIC 3. Do not add `streak`,
+  `frontierHistory`, or a dare surface, even though the passport model
+  will later grow them.
+- **No ListenBrainz auto-fill.** No username entry, no
+  `GET /api/listenbrainz/:username`, no backend proxy route, no
+  auto-stamping from listening data. That is EPIC 4. This EPIC's app stays
+  static (the only server is the static file server).
+- **No accounts, login, or server-side storage of any kind.** The
+  passport is local and portable.
+- **No shareable poster / PNG export.** JSON export/import only. The
+  poster is EPIC 4.
+- **No first-run guided walkthrough.** The skippable orientation card from
+  EPIC 1 stays as-is; do not build the multi-step guided success path
+  (EPIC 5). See boundary clarifications.
+- **No full-track playback or streaming.** 30-second iTunes previews only.
+- **No runtime LLM, no genre blurbs.**
+- **No in-app taxonomy editing, no user-submitted genres.**
 
-### Two boundary clarifications (read before building)
+### Boundary clarifications (read before building)
 
-These two lines sit exactly on the fence. Build them as written.
+These sit exactly on the fence. Build them as written.
 
-- **Lit rendering is in scope; the stamp interaction is not.** The
-  acceptance criteria require staging to show a partly-lit map
-  (`SEED_DEMO`), and the differentiator is territory glowing out of the
-  dark. So the renderer MUST support a lit state driven by a passport.
-  What stays out is the *interaction* that creates stamps. In this EPIC
-  the passport is populated only by the demo seeder, never by clicking a
-  genre. Do not add a stamp button, a tap-to-light gesture, or any
-  interaction-driven passport write.
-- **First-run orientation is in scope; the guided success walkthrough is
-  EPIC 5.** QUALITY BAR §4 requires a brand-new user to understand the
-  product and reach the core action. In this EPIC the reachable core
-  action is *exploring the map* (pan and zoom), because stamping does not
-  exist yet. So build a light, skippable first-run orientation that (a)
-  says in one line what the map is and (b) invites the user to explore.
-  Do NOT build the multi-step guided path that walks the stamp-hear-light
-  success. That path needs the stamp action and is owned by EPIC 5.
-  Building it here is drift into a non-goal.
+- **Hear-and-stamp is in scope; the dare is not.** Selecting a genre plays
+  it and reveals a Stamp button; stamping lights it and records the stamp.
+  What stays out is any *suggestion* of where to go next: no dare card, no
+  "try this neighbor", no frontier advancement prompt. The user drives
+  every selection by touching the map themselves.
+- **Un-stamp is in scope; bulk editing is not.** A single stamp can be
+  removed (from the now-playing panel or the passport view) so a mis-tap
+  is recoverable. Do not build multi-select, bulk clear, undo history, or
+  a "reset passport" beyond what import naturally does by replacing state.
+- **First-run orientation stays as EPIC 1 shipped it.** QUALITY BAR §4's
+  guided-success walkthrough is EPIC 5 and needs the dare loop to be
+  meaningful. Now that stamping exists, keep the existing one-time
+  orientation card; you MAY update its second line to point at the new
+  core action (hear + stamp) since that is now reachable, but do NOT build
+  a multi-step highlighted path. Building it here is drift into EPIC 5.
 
 ---
 
 ## Technical design
 
-### Stack and repository layout
+The stack is fixed by EPIC 1: Node + TypeScript pipeline, Vite static SPA,
+Canvas 2D map, nginx static serving, runtime `env.js`. Reuse the existing
+patterns (rate-limited client, append-only JSONL cache, deterministic
+emit, `scripts/copy-data.mjs`, `role="img"` canvas, `localStorage` state).
+The contracts below (schemas, budgets, thresholds) are firm; equivalent
+implementations are fine where noted.
 
-Recommended, buildable-by-one-agent stack. Equivalent substitutions are
-fine where noted; the contracts (schema, endpoints, budgets, thresholds)
-are firm.
-
-- **Pipeline:** Node.js + TypeScript scripts. Graph work with the
-  `graphology` ecosystem: `graphology`, `graphology-layout-forceatlas2`
-  (layout), `graphology-communities-louvain` (region clustering). These
-  are the recommended libraries because they are deterministic with a
-  fixed seed and purpose-built for exactly this graph-to-map job.
-- **Frontend:** Vite static build. **Canvas 2D** for the map (WebGL is
-  allowed but not required; ~2,200 nodes render smoothly on Canvas 2D
-  with a viewport transform and redraw-on-change). No UI framework is
-  required; a small one is fine if it does not bloat first render.
-- **Serving:** static files behind nginx in the container.
+### New and changed files
 
 ```
-/                         repo root
-  data/
-    genres.json           committed OUTPUT (the atlas)
-    demo-passport.json    committed demo seed (list of genre NAMES)
-    cache/                committed resumable pipeline cache (see below)
-  pipeline/               build-time TS scripts (Node)
-    index.ts              orchestrator: runs stages, resumable
-    fetch-genres.ts
-    fetch-relations.ts
-    fetch-cooccurrence.ts
-    build-graph.ts        similarity edges + top-K neighbors
-    layout.ts             ForceAtlas2, fixed seed
-    cluster.ts            Louvain, fixed seed
-    emit.ts               writes data/genres.json
-  web/                    Vite SPA
-    index.html
-    src/
-      main.ts
-      map/renderer.ts     canvas draw + viewport transform
-      map/input.ts        pan (drag/touch) + zoom (wheel/pinch) + keyboard
-      map/legend.ts       region legend (accessible DOM)
-      state/passport.ts   read passport + SEED_DEMO seeding
-      state/env.ts        reads window.__ENV__
-      ui/states.ts        skeleton / error / first-run orientation
-  test/                   automated tests (see Test plan)
-  Dockerfile
-  docker-compose.staging.yml
-  .env.example
-  README.md
-  LAYOUT_NOTES.md
-  package.json
+pipeline/
+  lib/itunes.ts          NEW  serialized iTunes Search client, ~20 req/min
+  fetch-exemplars.ts     NEW  stage: resolve one preview per genre (resumable)
+  emit-exemplars.ts      NEW  stage: write data/exemplars.json from cache
+  index.ts               EDIT register exemplars + emit-exemplars stages
+  types.ts               EDIT ExemplarRecord, ExemplarsFile shapes
+data/
+  cache/exemplars.jsonl  NEW committed resumable cache (one line per genre)
+  exemplars.json         NEW committed OUTPUT (previews keyed by mbid)
+web/src/
+  types.ts               EDIT Exemplar, ExemplarIndex, Passport v2, Stamp
+  state/passport.ts      EDIT v2 stamps, add/remove stamp, migrate, export/import
+  state/exemplars.ts     NEW  load + index exemplars.json (Map by mbid)
+  audio/player.ts        NEW  single Audio element, warm + play
+  ui/nowPlaying.ts       NEW  now-playing panel (hear + stamp + resting state)
+  ui/passportView.ts     NEW  passport panel (list, count, export/import, zoom-out)
+  map/renderer.ts        EDIT hitTest(screenX,screenY) -> Genre | null
+  map/input.ts           EDIT tap detection -> onSelect(genre)
+  main.ts                EDIT wire exemplars, audio, now-playing, passport view
+  index.html             EDIT passport button, now-playing + passport markup
+  style.css              EDIT now-playing panel, passport sheet styles
+scripts/copy-data.mjs    EDIT copy exemplars.json into web/public/data
+data/demo-passport.json  KEEP names; seed synthesizes dates + tracks (below)
 ```
 
-### Data sources (MusicBrainz web service)
+### Exemplar pipeline
 
-Use the MusicBrainz WS/2 JSON API. Do **not** attempt to download or
-parse the multi-GB database dumps; the API plus disk caching is the
-buildable path and satisfies the resumability contract.
+**Source: iTunes Search API (no key).**
+`https://itunes.apple.com/search?term=<genre>&entity=song&limit=25`.
+Returns `{ resultCount, results: [{ trackName, artistName, previewUrl,
+artworkUrl100, ... }] }`. For each genre, pick the **first result that has
+a non-empty `previewUrl`** as the exemplar; record `trackName`,
+`artistName`, `previewUrl`, and `artworkUrl100`. If no result has a
+preview, record a negative (see cache) so the genre is not refetched.
 
-- Base URL: `https://musicbrainz.org/ws/2/`
-- **Rate limit: at most 1 request per second.** Serialize requests and
-  sleep between them. Set a descriptive `User-Agent` identifying the app
-  and a contact (MusicBrainz requires this). Read the contact from an env
-  var with a placeholder in `.env.example`; never hardcode a personal
-  address in tracked files.
-- **Genre list:** `GET /genre/all?fmt=json&limit=100&offset=N`. Returns
-  `{ "genre-count": N, "genres": [{ "id": <mbid>, "name": <string> }] }`.
-  Page through all offsets. This is the authoritative set of genres the
-  output must cover.
-- **Genre-genre relationships:** attempt
-  `GET /genre/<mbid>?inc=genre-rels&fmt=json` and ingest any relationships
-  (subgenre-of, fusion-of, and similar) as **strong** edges. If the genre
-  entity returns no such relationships, proceed on co-occurrence alone.
-  Co-occurrence is the primary, always-available signal; genre-rels are a
-  boost where present.
-- **Artist tag co-occurrence (primary similarity signal):** for each
-  genre `G`, fetch up to 100 top artists tagged with `G` via
-  `GET /artist?query=tag:"<G>"&fmt=json&limit=100`. From those artists,
-  read the tags present on each artist and accumulate a weighted count of
-  every other tag that is itself a known genre. If the search response
-  does not include per-artist tags, fall back to
-  `GET /artist/<mbid>?inc=tags&fmt=json` per artist (heavier, still
-  cached and resumable). The result is, per genre, a vector of co-tag
-  weights over other genres.
+**`pipeline/lib/itunes.ts` (new client, mirrors `lib/mb.ts`):**
+- Serialized, single in-flight request, throttled to a **minimum 3000ms
+  interval** (≤ ~20 req/min). No API key, no personal contact required.
+- Set a descriptive `User-Agent` (reuse the app UA string; it needs no
+  secret). Encode the query with `encodeURIComponent`.
+- On `429`/`5xx`, honor `Retry-After` if present, else exponential
+  backoff, with a bounded retry count. A genre that still fails after
+  retries is left uncached (retried on the next pass), exactly like
+  `fetch-cooccurrence`. Never abort the whole run for one genre.
+- Export a `requestsMade()` counter for tests.
 
-### Pipeline: stages and resumability
+**Stage `fetch-exemplars` (`pipeline/fetch-exemplars.ts`):**
+- Load the genre list from `data/cache/genres.json` (authoritative set).
+- Read `data/cache/exemplars.jsonl`; build the set of already-completed
+  mbids (positive *and* negative records both count as done).
+- Front-load the same PRIORITY core set used by `fetch-cooccurrence` (the
+  ground-truth genres and demo-passport genres) so a partial run yields a
+  demo-ready, testable file. The rest follow in stable mbid order.
+- For each pending genre: query iTunes, append **one** JSONL line
+  (positive with track fields, or negative `{ mbid, name, found: false }`).
+  One appended line per completed genre so an interrupted run resumes
+  without repeating work.
+- Log progress every N genres and a final `fetched / negative / to-retry`
+  summary.
 
-The pipeline is a sequence of stages orchestrated by `pipeline/index.ts`.
-It must be **incremental and resumable**: an interrupted run resumes from
-committed cache without re-fetching, and a full run is allowed to take
-longer than an hour. Partial coverage is a valid, committable state.
+**Stage `emit-exemplars` (`pipeline/emit-exemplars.ts`):**
+- Read `data/cache/exemplars.jsonl` and the committed atlas
+  `data/genres.json` (for the authoritative mbid set and total count).
+- Emit `data/exemplars.json` with only the **positive** exemplars, keyed
+  by **mbid** (stable across atlas rebuilds; the client joins on
+  `genre.mbid`). Drop any cached mbid absent from the current atlas.
+- Deterministic: sort keys by mbid; use a fixed `generated` timestamp read
+  from `data/cache/genres.json`'s `fetchedAt` (same source EPIC 1 uses),
+  so two runs from the same cache produce a byte-identical file with **no
+  network calls**.
 
-Stages:
-
-1. **fetch-genres** → writes `data/cache/genres.json` (raw genre list).
-   Cheap; a few paginated calls.
-2. **fetch-relations** → per-genre genre-rels, cached in
-   `data/cache/relations/` (or one JSONL). Skips genres already cached.
-3. **fetch-cooccurrence** → per-genre co-occurrence vectors, cached in
-   `data/cache/cooccurrence.jsonl` (append-only, one line per completed
-   genre). The heavy stage. On each run it processes only genres not yet
-   present in the cache, so resuming after interruption never repeats
-   work. This is what makes a >1h build safe.
-4. **build-graph** → from the cache, compute pairwise genre similarity
-   (cosine similarity of co-occurrence vectors; add a fixed boost when an
-   explicit genre relationship exists), keep the **top-K = 10** most
-   similar neighbors per genre as edges. Deterministic.
-5. **layout** → ForceAtlas2 on the graph with a **fixed seed** and a fixed
-   iteration count; normalize coordinates into a stable bounds box.
-   Deterministic: same cache in, same coordinates out.
-6. **cluster** → Louvain community detection with a fixed seed → integer
-   `region` id per genre. Label each region by the name of its
-   highest-degree (most central) genre for the legend.
-7. **emit** → write `data/genres.json` (schema below), covering **every**
-   genre from stage 1. A genre with no co-occurrence data yet still
-   appears (placed by whatever edges exist, or isolated); coverage is
-   honest, never faked.
-
-Resumability contract to satisfy: deleting `data/genres.json` and
-re-running the pipeline with the cache present regenerates an identical
-file **without any network calls**; deleting one genre's cache entry and
-re-running re-fetches only that genre. `data/cache/` is committed so a
-fresh clone resumes rather than restarts.
-
-### `data/genres.json` schema (forward-only)
-
+**`data/exemplars.json` schema (forward-only):**
 ```jsonc
 {
   "version": 1,
-  "generated": "2026-09-10T00:00:00Z",   // ISO timestamp from the run
-  "source": "MusicBrainz",
-  "bounds": { "minX": number, "maxX": number, "minY": number, "maxY": number },
-  "regions": [
-    { "id": 0, "label": "metal" }         // label = most central genre in region
-  ],
-  "genres": [
-    {
-      "id": 0,                            // 0-based integer index, stable within a build
-      "mbid": "b74b3b6c-...",             // MusicBrainz genre id
-      "name": "black metal",
-      "x": 123.4,
-      "y": -56.7,
-      "region": 3,                        // references regions[].id
-      "neighbors": [12, 45, 78]           // up to 10 genre ids, most similar first
+  "generated": "2026-09-10T00:00:00Z",   // = genres cache fetchedAt (deterministic)
+  "source": "iTunes Search API",
+  "coverage": { "total": 2197, "withPreview": 1487 },  // honest, flagged
+  "exemplars": {
+    "b74b3b6c-...": {                     // key = genre mbid
+      "trackTitle": "…",
+      "artist": "…",
+      "previewUrl": "https://audio-ssl.itunes.apple.com/…m4a",
+      "artworkUrl": "https://…/100x100bb.jpg"            // optional; omit if absent
     }
-  ]
+  }
+}
+```
+- **Size budget:** `data/exemplars.json` gzipped MUST be under **300KB** so
+  it never delays first render. If real coverage pushes it over, drop
+  `artworkUrl` first (artwork is a nice-to-have, the preview is the point).
+- Forward-only: EPIC 3/4 may add fields; do not remove or rename these.
+
+**Resumability contract (must hold, mirrors EPIC 1):** deleting
+`data/exemplars.json` and re-running `emit-exemplars` with the cache
+present regenerates a byte-identical file with **zero** network calls;
+deleting one genre's line from `exemplars.jsonl` and re-running the fetch
+stage refetches **only** that genre. `data/cache/exemplars.jsonl` is
+committed so a fresh clone resumes rather than restarts.
+
+**Package scripts (add, keep the atlas pipeline separate so an atlas
+rebuild never triggers iTunes fetches):**
+- `exemplars:fetch` → `tsx pipeline/index.ts exemplars`
+- `exemplars:emit` → `tsx pipeline/index.ts emit-exemplars`
+
+### Passport v2 (client state, browser-only)
+
+Extend `web/src/state/passport.ts`. The renderer only needs a lit set, so
+`litSet(passport)` keeps returning `Set<genreId>`; the renderer is
+unchanged apart from `hitTest`.
+
+```ts
+interface Stamp {
+  genreId: number;      // atlas id, for fast lit lookup this session
+  mbid: string;         // stable across atlas rebuilds (join key on import)
+  date: string;         // first-listen date, "YYYY-MM-DD" (local)
+  trackTitle?: string;  // the track that earned it (from the exemplar)
+  artist?: string;
+}
+interface Passport {
+  version: 2;
+  stamps: Stamp[];      // at most one per genre; genreId unique
 }
 ```
 
-- `neighbors` holds **integer `id`s** (not MBIDs) to keep the file lean.
-- Every `neighbors` entry MUST reference an existing `genres[].id`.
-- The file is forward-only extensible: EPIC 2 will add exemplar fields.
-  Do not add exemplar/coverage/preview fields now.
-- **Size budget:** `data/genres.json` gzipped MUST be under 400KB so first
-  render is fast.
+- **`localStorage` key stays `passport`.** `readPassport()` runs a
+  `migratePassport(raw)`:
+  - v2 object with a `stamps` array → validated passthrough (drop stamps
+    whose genreId/mbid is not resolvable in the loaded atlas; coerce/repair
+    types; keep at most one stamp per genre).
+  - **legacy v1** `{ lit: number[] }` (what EPIC 1 and the old demo seed
+    wrote) → convert each id to `{ genreId, mbid, date: today }` with no
+    track fields (unknown at migration time). No data is lost; the map
+    stays lit.
+  - anything else / corrupt → treat as empty passport.
+- **`addStamp(genreId, exemplar?)`**: no-op if already stamped; else append
+  a stamp with `date = today` (local `YYYY-MM-DD`) and, when an exemplar
+  exists, `trackTitle`/`artist` from it. Persist synchronously.
+- **`removeStamp(genreId)`**: drop the stamp, persist.
+- **`exportPassport()`**: serialize the current passport to a JSON string
+  for download (see UI). No network.
+- **`importPassport(text)`**: parse and **validate at the boundary**
+  before replacing state:
+  - reject non-JSON / wrong shape with a product-voice error (no stack
+    trace);
+  - cap `stamps` length at the atlas genre count; drop stamps whose `mbid`
+    is not in the atlas; re-resolve `genreId` from `mbid` against the
+    loaded atlas (so an import survives an atlas rebuild); truncate
+    `trackTitle`/`artist` to a sane length; keep dates only if they match
+    `YYYY-MM-DD`, else drop the date field.
+  - Strings are rendered with `textContent` only (never `innerHTML`), so a
+    malicious import cannot inject markup.
 
-### Passport, demo seed, and `SEED_DEMO`
+### Demo seed (staging must show a rich passport)
 
-- **Passport shape (client-only, this EPIC):** the minimum needed to light
-  the map. `{ "lit": [<genreId>, ...] }` in browser storage
-  (`localStorage` key e.g. `passport`). No stamp metadata is required in
-  this EPIC (dates and tracks arrive in EPIC 2).
-- **`data/demo-passport.json`:** a committed, small list of genre **NAMES**
-  (not ids, so it survives pipeline regeneration) chosen to produce the
-  signature look: roughly **three glowing neighborhoods** in a dark world.
-  Pick a few metal subgenres, a few jazz/blues genres, and a few
-  electronic genres, all names that exist in the MusicBrainz genre set.
-  The app resolves names to ids at load time by name lookup; names absent
-  from the atlas are skipped.
-- **`SEED_DEMO` flow (runtime env, no rebuild):** the static app reads a
-  runtime config object `window.__ENV__` injected by a small file
-  `env.js`. The container entrypoint generates `env.js` from environment
-  variables at start (envsubst on a template), so the same image toggles
-  behavior via env. When `window.__ENV__.SEED_DEMO === "1"` and no
-  passport exists yet, the app seeds the passport from
-  `demo-passport.json` on first load. When unset or `"0"`, the app starts
-  with an empty (all-dark) passport. `.env.example` lists `SEED_DEMO`
-  with a placeholder; `docker-compose.staging.yml` sets `SEED_DEMO=1`.
+`data/demo-passport.json` stays a list of genre **names** (survives atlas
+regeneration). The seeding path in `resolveInitialPassport` (already gated
+by `SEED_DEMO` + "no existing passport") now produces **full v2 stamps**:
+for each resolved name, create a stamp whose `date` steps back a few days
+from today (deterministic per index, so the passport view shows a
+plausible exploration history) and whose `trackTitle`/`artist` come from
+the loaded exemplar when present. This makes the staging passport view
+demonstrate its real value (dated stamps with tracks), not a bare list.
 
-Do not use Vite build-time env for `SEED_DEMO`; the runtime `env.js`
-pattern is required so staging can toggle the seed without rebuilding.
+### Hearing a genre (audio + selection)
 
-### Frontend rendering
+**Loading exemplars (`web/src/state/exemplars.ts`):** fetch
+`/data/exemplars.json` and build a `Map<mbid, Exemplar>`. Load it **in
+parallel with, and never blocking, the map render** (the map paints from
+`genres.json` first; audio becomes available when exemplars resolve).
+`getExemplar(genre)` returns the entry or `undefined`.
 
-- **Canvas map.** One full-viewport canvas, `devicePixelRatio`-aware. A
-  viewport transform (offset + scale) maps atlas coordinates to screen.
-  Redraw on change only (requestAnimationFrame), not in a busy loop.
-- **Unlit genres:** dim, low-contrast dots on a near-black background.
-- **Lit genres (passport):** rendered in their `region` color at high
-  lightness with a soft glow so territory reads as *glowing out of the
-  dark*. Assign region colors from a fixed palette of distinct hues
-  (aim for reasonable separation and good contrast on dark; a
-  colorblind-aware ordering is preferred but not required to be perfect).
-- **Labels:** legible at appropriate zoom. Show labels only for nodes
-  above a screen-size/zoom threshold and within the viewport to avoid
-  clutter; enforce a minimum readable font size and sufficient contrast.
-  At the default zoomed-out view, show a small number of region-level or
-  high-degree labels so the map is never an unlabeled dot field.
-- **Pan and zoom:** drag to pan (mouse and touch); wheel and pinch to
-  zoom; on-screen zoom in/out and reset-view controls (each ≥44px).
-  Keyboard: arrow keys pan, `+`/`-` zoom, so keyboard reaches everything
-  the mouse can. Clamp zoom to sane min/max and keep the atlas within
-  reach (no panning into empty infinity).
-- **Performance:** skeleton visible immediately (well under 1s); the real
-  map interactive quickly after `genres.json` loads; pan and zoom stay
-  smooth with all genres on a 390px viewport, with no visible jank. No
-  horizontal scroll at 390px.
-- **Accessibility:** the canvas carries `role="img"` and an `aria-label`
-  summarizing the map (for example, the genre count and how many are
-  lit). The region legend is real, accessible DOM (not canvas-only).
-  Visible focus states on all controls; every control labeled.
+**Audio (`web/src/audio/player.ts`):** ONE reusable `HTMLAudioElement`,
+`preload="auto"`.
+- `warm(url)`: if `url` differs from the current src, set src (begins
+  buffering). Called on desktop hover and on the pointerdown that may
+  become a tap, so the clip is warm before the tap resolves.
+- `play(url)`: set src if needed, then `play()`. MUST be called
+  synchronously inside the tap gesture so mobile autoplay policy is
+  satisfied. Selecting a new genre stops the previous clip; a clip plays
+  to its natural 30s end otherwise.
+- `stop()`: pause and reset. Called when the now-playing panel closes or
+  the user taps empty map space.
+- Expose a test hook `window.__nowPlaying = { mbid, trackTitle, artist,
+  hasPreview, playing }`, updated synchronously on select (audio output is
+  unreliable in headless browsers; tests assert intent + UI, not sound).
 
-### Designed states and copy (swept)
+**Hit-testing (`map/renderer.ts`):** add
+`hitTest(screenX, screenY): Genre | null` — invert the viewport transform,
+find the nearest genre within a **tap radius of ~14px** (comfortable on
+touch); return null if none. Linear scan over 2,197 nodes is well under a
+frame; no spatial index needed.
 
-Use these strings verbatim (already swept for em-dashes, banned
-vocabulary, and negative empty-state phrasing). If you change them,
-re-sweep.
+**Tap vs pan (`map/input.ts`):** a pointer sequence is a **tap** when
+pointerup occurs within ~6px of pointerdown and under ~400ms; a larger
+move is a pan (unchanged). On tap, call `onSelect(genre | null)` supplied
+by `main.ts`. On pointerdown of a potential tap over a genre, call
+`audio.warm(previewUrl)` to pre-buffer.
 
-- **Loading / skeleton** (holds layout steady, dim placeholder field,
-  never a white screen): `Charting the atlas of music.`
-- **First-run orientation** (skippable; shown until dismissed, then never
-  again via a `localStorage` flag):
-  - Line 1 (what it is): `A map of every music genre. The places you explore light up.`
-  - Line 2 (how to explore): `Drag to explore. Pinch to zoom.`
-  - Dismiss control label: `Got it`
-- **Error** (data failed to load; product voice, actionable, with a
-  retry): heading `Let's try that again`, body
-  `Check your connection and reload the map.`, button `Reload`
-- **Controls** (aria-labels): `Zoom in`, `Zoom out`, `Reset view`
-- **Legend** heading: `Regions`
+**Selection flow (`main.ts` + `ui/nowPlaying.ts`):** on select of a genre:
+1. Synchronously (this tick, well under 100ms): highlight the node, open
+   the now-playing panel with the track/artist (or resting state), update
+   `window.__nowPlaying`.
+2. If it has a preview, `audio.play(url)`; else leave the panel in the
+   resting state (no player controls, no error).
+3. The panel shows a **Stamp** button (primary). Tapping it calls
+   `addStamp`, then `renderer.setLit(newLitSet)` **immediately**
+   (optimistic light), updates the canvas `aria-label` lit count, and
+   flips the button to a stamped state with a Remove affordance. Persist
+   after the optimistic render.
+- Selecting empty space (`hitTest` null) closes the panel and stops audio.
 
-The map is never truly empty in this EPIC (it always renders the full
-atlas), so there is no blank empty state to design; the "nothing lit yet"
-condition is the normal dark default, oriented by the first-run copy
-above.
+### The passport view (`ui/passportView.ts`)
 
-### Deploy scaffold
+A panel/sheet toggled by a **Passport button** (top-right, ≥44px, shows the
+lit count as a badge). Contents:
+- **Header:** title `Passport`, count line `{N} of ~2,200 lit` (use the
+  literal `~2,200`; N is live).
+- **Stamp list:** newest first. Each row: a region-color swatch, the genre
+  name, a secondary line `"{trackTitle} · {artist}"` when known (middot
+  separator, not a dash) else the date alone, and the first-listen date.
+  Each row has a small **Remove** control. Rows are the only unbounded
+  list in the app; it is capped by the genre count (~2,200) and scrolls
+  within the sheet, so it cannot grow without bound.
+- **Empty state (designed, positive, directive, points at the map):**
+  headline `Your map is dark`, body `Tap a genre to hear it. Stamp the
+  ones you love.`, and the panel closes to reveal the map. (No blank
+  region, no negative phrasing.)
+- **Actions:** `Export` (download), `Import` (file picker), and
+  `See your map` — the last closes the panel and calls `renderer.fit()` so
+  the user lands on the zoom-out signature moment (their glow against the
+  dark). This works from the first three stamps with no special case.
+- **Export:** build a `Blob` of `exportPassport()`, create an object URL,
+  click a hidden `<a download="music-passport.json">`, revoke the URL. No
+  network.
+- **Import:** hidden `<input type="file" accept="application/json">`; on
+  change, read the file, call `importPassport(text)`; on success replace
+  state, `renderer.setLit(...)`, refresh the list and count; on failure
+  show a product-voice inline message (see copy).
 
-- **Dockerfile:** multi-stage. Stage 1 (node) installs deps and runs the
-  Vite build (the committed `data/genres.json` and `demo-passport.json`
-  are bundled or copied into the static output). Stage 2 (nginx:alpine)
-  serves the static build. An entrypoint script generates
-  `/usr/share/nginx/html/env.js` from environment
-  (`SEED_DEMO`, and the optional analytics/error keys below) before nginx
-  starts. The Dockerfile builds the **static app**; it does not run the
-  data pipeline (the pipeline runs offline; its output is committed).
-- **docker-compose.staging.yml:** builds and serves the app on a mapped
-  port; sets `environment: SEED_DEMO=1` so staging shows a partly-lit
-  map. A container healthcheck on the served index is fine (there is no
-  backend `/healthz` in this EPIC).
-- **Analytics and error tracking (env-gated, no-op without env):** if
-  `SENTRY_DSN` is present, initialize the Sentry browser SDK in the
-  frontend; if `UMAMI_URL` and `UMAMI_WEBSITE_ID` are present, include the
-  Umami script. Both flow through `env.js` and MUST be completely inert
-  when their env is absent. Keep this minimal; do not add custom event
-  instrumentation in this EPIC.
-- **.env.example:** placeholders only, no real secrets. At least:
-  `SEED_DEMO`, `MUSICBRAINZ_CONTACT` (pipeline User-Agent contact),
-  `SENTRY_DSN`, `UMAMI_URL`, `UMAMI_WEBSITE_ID`. `.env` stays untracked.
+### Designed states and copy (verbatim, already swept)
 
-### README (for strangers)
+Use these strings exactly. If you change them, re-sweep for em-dashes/
+en-dashes, banned vocabulary, and negative empty-state phrasing.
 
-`README.md` must let a stranger who never saw this project:
-- **Understand** it in two or three plain sentences (a living map of every
-  music genre; the places you explore light up; built on open MusicBrainz
-  data).
-- **Run** it with the exact commands, verified against the actual files:
-  clone, `cp .env.example .env`, then the real
-  `docker compose -f docker-compose.staging.yml up --build` command and
-  the URL to open. Include how to regenerate the atlas
-  (`npm run build:atlas` or the actual script name) and note it is
-  incremental and resumable.
-- **Contribute:** where the pipeline and web code live, and how to run the
-  tests.
-- No factory internals (no mention of the pipeline that built this repo,
-  agents, task types, or internal service hostnames).
+- **Now playing, has preview:** primary button `Stamp`; once stamped, the
+  control shows `Stamped {date}` with a secondary `Remove stamp`.
+- **Now playing, resting state (genre has no preview):** body
+  `Silent for now. Stamp it to remember.`; primary button `Stamp`. (No
+  player controls, no error, no "no preview" text.)
+- **Passport button label / aria-label:** `Passport`.
+- **Passport header:** `Passport`; count line `{N} of ~2,200 lit`.
+- **Passport empty state:** headline `Your map is dark`; body `Tap a genre
+  to hear it. Stamp the ones you love.`
+- **Passport actions:** `Export`, `Import`, `See your map`.
+- **Import success (inline):** `Passport restored.`
+- **Import failure (inline, product voice, actionable):** `That file did
+  not look like a passport. Pick a passport you exported here.`
+- **Row remove control aria-label:** `Remove stamp` (+ genre name for
+  screen readers).
+
+Sweep note: separators in the stamp list use the middot `·`, never a dash.
+The count uses `~2,200`. The failure copy avoids "something went wrong"
+and stack traces. Extend the copy-lint test's dynamic-string list with all
+strings above (the ones built in TS), since only `index.html` is scanned
+from disk.
+
+### Accessibility and mobile
+
+- The now-playing panel and passport sheet are real DOM with headings,
+  labeled buttons, and visible focus (reuse the EPIC 1 `:focus-visible`
+  rules). Every button ≥44px. Opening the passport moves focus into it;
+  closing returns focus to the Passport button. `Escape` closes either
+  overlay.
+- The canvas `aria-label` continues to report genre and lit counts; update
+  it on every stamp/un-stamp so assistive tech hears the frontier move.
+- The map is a canvas, so genre selection is pointer-driven; provide a
+  keyboard path to the passport and its controls (they are DOM). Selecting
+  individual genres by keyboard on the canvas is **not** required in this
+  EPIC (canvas node-level keyboard nav is a known limitation carried
+  forward; note it, do not build a hidden DOM node per genre now).
+- Mobile-first at 390px: passport is a bottom/full sheet, now-playing
+  panel sits above the zoom controls and clears the safe-area insets, no
+  horizontal scroll, artwork and text readable without zoom.
+
+### Performance
+
+- First meaningful render is unchanged and must stay <1s: the map paints
+  from `genres.json`; `exemplars.json` loads in parallel and only gates
+  audio, never the map.
+- Stamp feedback is optimistic and synchronous (<100ms): light the node,
+  then persist.
+- No unindexed hot-path work: hit-test is a bounded linear scan; the stamp
+  list is capped by the genre count and scrolls.
+
+### Deploy, README, env
+
+- `scripts/copy-data.mjs`: add `exemplars.json` to the copied files, with a
+  safe placeholder (`{ "version":1, "generated":"1970-01-01T00:00:00Z",
+  "source":"iTunes Search API", "coverage":{"total":0,"withPreview":0},
+  "exemplars":{} }`) when the file is absent, so dev/build work before the
+  exemplar pipeline has run.
+- No new runtime env is required (no key, no backend). Do not add secrets.
+  `.env.example` gains a short comment that the exemplar stage needs no
+  key. `SEED_DEMO` behavior is unchanged (now seeds richer stamps).
+- **README:** add the exemplar pipeline to the "regenerate the data"
+  section with the exact new script names (`npm run exemplars:fetch`,
+  `npm run exemplars:emit`), noting it is incremental, resumable, honors
+  the polite iTunes rate, and that partial coverage is expected and shown
+  honestly. Update the one-line product description if needed to mention
+  hearing and stamping. Verify every command against the actual files. No
+  factory internals.
 
 ---
 
 ## Ordered task list (each with acceptance criteria)
 
-### Task 1 — Scaffold and toolchain
-Set up `package.json`, TypeScript, Vite web app, and the empty
-`pipeline/` and `test/` trees.
-- **AC:** `npm install` succeeds; `npm run build` produces a static
-  bundle; `npm test` runs (even if trivially) and the test runner is
-  wired.
+### Task 1 — Exemplar fetch stage (resumable, rate-limited)
+Add `lib/itunes.ts`, `fetch-exemplars.ts`, wire the `exemplars` stage into
+`index.ts` and `package.json`. Add `ExemplarRecord` to `pipeline/types.ts`.
+- **AC:** running the stage appends to `data/cache/exemplars.jsonl` (one
+  line per completed genre, positive or negative); re-running makes
+  **zero** network calls for already-cached genres; deleting one line
+  refetches only that genre; requests are throttled to ≤ ~20/min;
+  transient failures are retried and, if still failing, left for the next
+  pass without aborting the run.
 
-### Task 2 — Pipeline fetch stages (resumable cache)
-Implement fetch-genres, fetch-relations, fetch-cooccurrence with 1 req/s
-rate limiting, a descriptive User-Agent from env, and per-genre disk
-caching under `data/cache/`.
-- **AC:** running the fetch stages populates `data/cache/`; re-running
-  makes **zero** network calls for already-cached genres; interrupting and
-  resuming continues from the last cached genre; a missing contact env
-  fails loudly with a clear message rather than sending a bad User-Agent.
+### Task 2 — Emit `data/exemplars.json` (deterministic, flagged, budgeted)
+Add `emit-exemplars.ts` and wire it into `index.ts`/`package.json`.
+- **AC:** given a fixed cache and committed atlas, emit writes
+  `data/exemplars.json` keyed by mbid with only positive exemplars, a
+  `coverage` object, and a deterministic `generated`; two runs from the
+  same cache are **byte-identical** with no network; every key resolves to
+  a genre in `data/genres.json`; the file is **under 300KB gzipped**.
 
-### Task 3 — Graph, layout, clustering, emit
-Implement build-graph (cosine similarity, genre-rel boost, top-K=10
-neighbors), ForceAtlas2 layout (fixed seed), Louvain clustering (fixed
-seed), and emit `data/genres.json` per schema.
-- **AC:** given a fixed cache, the pipeline emits a `data/genres.json`
-  that (a) contains **every** genre from the genre list, (b) has valid
-  `x`/`y`/`region`/`neighbors` for each, (c) every `neighbors` id
-  references an existing genre, (d) is byte-identical across two runs from
-  the same cache with no network calls, and (e) is under 400KB gzipped.
+### Task 3 — Real exemplar data committed
+Run the exemplar pipeline against real iTunes data (to completion or to a
+committed resumable checkpoint with broad coverage of the priority set and
+the demo genres), commit `data/exemplars.json` and
+`data/cache/exemplars.jsonl`.
+- **AC:** `data/exemplars.json` is committed with real previews; every
+  `data/demo-passport.json` genre that has an iTunes preview resolves to
+  one (so staging can hear and show tracks); coverage is reported honestly
+  in the file; the gzip budget holds.
 
-### Task 4 — Real data, layout proximity test, LAYOUT_NOTES
-Run the pipeline against real MusicBrainz data (to completion or to a
-committed resumable checkpoint with broad coverage), commit
-`data/genres.json` and `data/cache/`, add the automated proximity test,
-and write `LAYOUT_NOTES.md` with a screenshot.
-- **AC:** `data/genres.json` is committed with real data covering the full
-  genre set. The automated proximity test (Test plan T4) passes. Manual
-  eyes check for jank and label legibility captured. `LAYOUT_NOTES.md`
-  records, for each named check (metal subgenres cluster, jazz borders
-  blues, zeuhl near prog rock), PASS/FAIL and the observed nearest genres,
-  plus references a committed screenshot artifact of the labeled map.
-  If a named genre is absent from MusicBrainz, the notes state the
-  substitution used.
+### Task 4 — Passport v2, migration, stamp/un-stamp, export/import
+Extend `state/passport.ts`: v2 stamps, `migratePassport`, `addStamp`,
+`removeStamp`, `exportPassport`, `importPassport` with boundary
+validation. Update the demo seed to synthesize dated stamps with tracks.
+- **AC:** a legacy `{lit:[...]}` passport migrates to v2 with the same
+  genres lit and no data loss; adding a stamp records genreId, mbid, local
+  date, and track fields when an exemplar exists; removing works; export
+  then import round-trips to an equivalent passport; import rejects
+  non-JSON/garbage without throwing to the UI, drops stamps whose mbid is
+  absent from the atlas, re-resolves genreId from mbid, and caps length;
+  imported strings are never rendered as HTML.
 
-### Task 5 — Map render, pan/zoom, mobile
-Canvas renderer, viewport transform, unlit dot field, labels with a zoom
-threshold, drag/wheel/pinch/keyboard navigation, on-screen controls.
-- **AC:** the map renders all genres dark by default; pan and zoom are
-  smooth on a 390px viewport with no horizontal scroll; labels are legible
-  at appropriate zoom and not a cluttered mess when zoomed out; keyboard
-  arrows/`+`/`-` pan and zoom; controls are ≥44px.
+### Task 5 — Load exemplars, audio, hit-test, tap-to-select
+Add `state/exemplars.ts`, `audio/player.ts`; add `renderer.hitTest`; add
+tap detection + `onSelect` to `input.ts`; wire selection in `main.ts`.
+- **AC:** exemplars load in parallel and never delay first render; tapping
+  a genre selects it and (with a preview) starts audio within the tap
+  gesture with visible feedback under 100ms; a drag still pans and does not
+  select; tapping empty space deselects and stops audio; `window.__nowPlaying`
+  reflects the current selection synchronously.
 
-### Task 6 — Lit rendering, passport read, SEED_DEMO seed
-Read the passport from browser storage; render lit genres glowing in
-region color; implement `demo-passport.json` and the `env.js`/`SEED_DEMO`
-seeding path.
-- **AC:** with a passport present, those genres glow in region color over
-  the dark map; with `SEED_DEMO=1` and no existing passport, the app seeds
-  from `demo-passport.json` on first load and shows roughly three glowing
-  neighborhoods; with `SEED_DEMO` unset, the map starts all-dark. No
-  stamp control or interaction-driven passport write exists.
+### Task 6 — Now-playing panel and optimistic stamp
+Add `ui/nowPlaying.ts` and its markup/styles. Wire Stamp / Remove.
+- **AC:** selecting a genre with a preview shows the track and artist and a
+  Stamp button; selecting a genre without a preview shows the resting-state
+  copy and a Stamp button, never a broken player; tapping Stamp lights the
+  genre in its region color immediately and persists across reload; the
+  canvas `aria-label` lit count updates; Remove un-lights and persists.
 
-### Task 7 — Designed states, accessibility, copy sweep
-Skeleton, error-with-retry, first-run orientation (dismiss-once), canvas
-`role="img"`/`aria-label`, accessible legend, focus states, contrast.
-- **AC:** skeleton shows immediately and holds layout; a failed
-  `genres.json` load shows the error state with a working Reload; the
-  first-run orientation appears once and never again after dismissal;
-  keyboard reaches every control with visible focus; the copy sweep over
-  every user-visible string finds zero em-dashes/en-dashes, zero banned
-  vocabulary, and zero negative empty-state phrasing.
+### Task 7 — Passport view, count, export/import UI, zoom-out
+Add `ui/passportView.ts`, the Passport button, markup and styles; wire
+export download and import file picker; `See your map` calls `fit()`.
+- **AC:** the passport lists every stamp with its first-listen date and the
+  track that earned it, shows `N of ~2,200 lit`, and updates live on
+  stamp/un-stamp/import; the empty state shows the designed copy and points
+  at the map; Export downloads `music-passport.json` with no network;
+  Import restores the passport and re-lights the map; `See your map` frames
+  the zoom-out and works from the first three stamps; usable at 390px with
+  no horizontal scroll and ≥44px targets; focus is managed and `Escape`
+  closes.
 
-### Task 8 — Deploy scaffold
-Dockerfile (multi-stage, nginx, `env.js` entrypoint), 
-`docker-compose.staging.yml` (serves, `SEED_DEMO=1`, healthcheck),
-env-gated Sentry/Umami, `.env.example` placeholders.
-- **AC:** `docker compose -f docker-compose.staging.yml up --build` serves
-  the app locally; with the default `SEED_DEMO=1` the served map is
-  partly lit within a minute of opening; `.env.example` contains
-  placeholders only and `.env` is gitignored; the app runs with all
-  analytics/error env absent (they are inert).
-
-### Task 9 — README for strangers
-Write `README.md` per the README contract above.
-- **AC:** every command in the README is verified against the actual files
-  (compose filename, service, port, script names) and works from a clean
-  clone; no factory internals appear.
-
-### Task 10 — Test suite and final sweep
-Wire all automated tests (Test plan below) into `npm test`; run the full
-copy sweep one final time.
-- **AC:** `npm test` runs green; the sweep is clean.
+### Task 8 — States, accessibility, copy sweep, README, tests
+Final pass: designed states, focus management, extend the copy-lint
+dynamic-string list, update `scripts/copy-data.mjs`, `.env.example`,
+`README.md`, and wire all tests below into `npm test`.
+- **AC:** `npm test` runs green; the copy sweep over every user-visible
+  string (including the new TS strings) finds zero em-dashes/en-dashes,
+  zero banned vocabulary, and zero negative empty-state phrasing; the
+  README commands are verified against the actual files; `.env.example`
+  holds placeholders only and mentions no key is needed for exemplars.
 
 ---
 
 ## Test plan (which automated test proves each planner criterion)
 
-Map from the planner's acceptance criteria to concrete tests.
+- **T1 — Exemplar pipeline resolves, incremental, resumable, rate-flagged.**
+  Integration test with a mocked iTunes fetch over a small fixture genre
+  cache: (a) the fetch stage appends one line per genre and makes zero
+  calls for already-cached genres; (b) removing one cache line causes only
+  that genre to be refetched; (c) the throttle enforces the ≥3000ms
+  interval (assert the client's spacing/`requestsMade` under fake timers or
+  a spy); (d) a genre with no preview records a negative and is not
+  refetched. **Proves:** *resolves one preview per genre where one exists,
+  incremental and resumable, honors ~20 req/min, partial coverage valid and
+  flagged.*
 
-- **T1 — Pipeline regenerates, incremental, resumable, >1h allowed.**
-  Unit/integration test with a small fixture cache: (a) running emit from
-  cache produces `genres.json` with no network calls (network layer
-  mocked/asserted zero calls); (b) two runs from the same fixture cache
-  produce byte-identical output (determinism = resumability of the compute
-  half); (c) a test that seeds a partial cache (some genres missing) and
-  asserts the fetch stage would fetch only the missing ones and that emit
-  still produces a valid file over the present genres. Proves: *committed
-  script regenerates; incremental and resumable; partial progress valid.*
+- **T2 — `exemplars.json` schema, coverage, join, budget.** Load the
+  committed `data/exemplars.json` and `data/genres.json`: every exemplar
+  key is an mbid present in the atlas; each entry has non-empty
+  `previewUrl`, `trackTitle`, `artist`; `coverage.total` equals the atlas
+  genre count and `withPreview` equals the entry count; two emit runs from
+  the same cache are byte-identical; gzipped size < 300KB. **Proves:**
+  *commits `data/exemplars.json`, one preview per genre where one exists,
+  coverage flagged.*
 
-- **T2 — Coverage and schema of `data/genres.json`.** A test that loads
-  the **committed** `data/genres.json` and asserts: every genre from the
-  committed genre-list cache appears; each has numeric `x`/`y`, an integer
-  `region` in `regions`, and a `neighbors` array of ≤10 ids each
-  referencing an existing genre; gzipped size < 400KB. Proves: *covers
-  every genre with x/y, neighbors[], region.*
+- **T3 — Hear a genre within 100ms perceived; honest resting state.** E2E:
+  tap a known-preview genre; assert the now-playing panel shows the track
+  and `window.__nowPlaying.playing` is true within a tight budget (audio
+  intent + UI, not sound output); tap a genre known to lack a preview and
+  assert the resting-state copy shows and no player/error element appears.
+  Unit: `audio.play` sets src and calls play; selecting a new genre stops
+  the previous. **Proves:** *touching a genre starts audio within 100ms as
+  perceived; a genre with no preview shows an honest resting state.*
 
-- **T3 — Map renders, pannable/zoomable, mobile, skeleton first.**
-  End-to-end (Playwright or equivalent) at a 390px viewport: skeleton
-  element present before data resolves; canvas present after load;
-  `document.documentElement.scrollWidth <= innerWidth` (no horizontal
-  scroll); simulated drag changes the viewport transform; zoom control
-  changes scale. A payload-budget assertion that the map data fetched is
-  within budget. Proves: *renders all genres, pannable/zoomable, smooth on
-  390px, no horizontal scroll, skeleton not blank page.* (Frame-rate
-  smoothness is verified by eye and recorded in `LAYOUT_NOTES.md`.)
+- **T4 — Optimistic stamp lights immediately and persists.** E2E: select a
+  genre, click Stamp, assert the canvas `aria-label` lit count increments
+  synchronously; reload and assert the genre is still lit (localStorage).
+  Unit: `addStamp` is idempotent, records date + track; `litSet` includes
+  it; `removeStamp` reverses it. **Proves:** *tapping stamp lights the
+  genre in color immediately (optimistic) and persists across reload.*
 
-- **T4 — Layout eyes test, made repeatable.** An automated proximity test
-  over the committed `data/genres.json`, using **nearest-neighbor
-  membership** (robust, not brittle absolute distances): a set of metal
-  subgenres are mutually within each other's k-nearest (k≈30) and closer
-  on average than random pairs; `blues` is within `jazz`'s k-nearest;
-  `zeuhl` is within `progressive rock`'s k-nearest. Genres absent from the
-  data are skipped and the skip is logged. Plus the manual record in
-  `LAYOUT_NOTES.md` with a screenshot artifact. Proves: *layout passes the
-  eyes test against named ground truth; LAYOUT_NOTES.md + screenshot.*
+- **T5 — Passport view: list, count, zoom-out from three stamps.** E2E:
+  seed three stamps, open the passport, assert three rows each with a date
+  and the earning track, the `N of ~2,200 lit` count, and that
+  `See your map` closes the panel and fits the view (renderer viewport
+  changes to the fit scale). Empty-passport E2E: the empty-state copy shows
+  and points at the map. **Proves:** *passport lists stamps with
+  first-listen date and the track that earned each, shows N of ~2,200 lit,
+  zoom-out works from the first three stamps.*
 
-- **T5 — Unlit default, lit rendering, states, copy.** Unit test: given an
-  empty passport the renderer marks zero genres lit; given a passport the
-  renderer marks exactly those genres lit with their region color. E2E:
-  first-run orientation shows once then not after dismissal (localStorage
-  flag); forcing a failed data fetch shows the error state with a working
-  Reload. A copy-lint test that greps every user-visible string for
-  em-dashes/en-dashes, the banned vocabulary list, and negative
-  empty-state phrasing and asserts zero hits. Proves: *unlit by default;
-  labels legible; loading and error states designed in product voice.*
+- **T6 — Export/import round-trip, browser-only, validated.** Unit:
+  `exportPassport`→`importPassport` yields an equivalent passport;
+  `importPassport` rejects non-JSON and wrong shapes without throwing to
+  the UI, drops stamps whose mbid is not in the atlas, re-resolves genreId
+  from mbid, and caps length. E2E: Export triggers a `music-passport.json`
+  download (assert the download event / `a[download]`); no network request
+  leaves the origin during export/import (assert via route interception).
+  **Proves:** *one click exports JSON, import restores it, data never
+  leaves the browser except the downloaded file.*
 
-- **T6 — SEED_DEMO and staging scaffold.** Unit/E2E: with
-  `window.__ENV__.SEED_DEMO="1"` and no stored passport, the app seeds
-  from `demo-passport.json` and lights the mapped genres; with it unset,
-  nothing is lit. A test/assertion that `demo-passport.json` names resolve
-  to real genres in `genres.json` (so the demo is never empty). A check
-  that `.env.example` contains no real secret values. The compose bring-up
-  is verified manually and captured (the README command runs). Proves:
-  *Dockerfile builds static app; compose serves it; SEED_DEMO seeds a demo
-  passport for a partly-lit map within a minute; .env.example placeholders
-  only.*
+- **T7 — Empty state, mobile, accessibility, copy sweep.** E2E at 390px:
+  no horizontal scroll with the passport open; Passport button and actions
+  ≥44px; focus enters the passport on open and `Escape` closes it. Copy
+  lint (extended `visibleCopy()` including the new TS strings): zero
+  em-dashes/en-dashes, zero banned vocabulary, zero negative empty-state
+  phrasing. **Proves:** *empty passport state uses positive, directive copy
+  and points at the first action; mobile-first, accessible, copy sweep
+  clean.*
 
-- **T7 — README correctness.** A check (script or documented manual
-  verification in the run) that the compose filename, service name, port,
-  and npm script names referenced in `README.md` match the actual files.
-  Proves: *README lets a stranger clone, configure, run with the exact
-  commands, verified against the actual files.*
+- **T8 — Migration and demo seed.** Unit: a stored legacy `{lit:[...]}`
+  migrates to v2 with the same genres lit; with `SEED_DEMO="1"` and no
+  stored passport, the seed produces v2 stamps with dates and (where the
+  exemplar exists) tracks, and every demo name that resolves is stamped.
+  **Proves:** the demo/staging passport view demonstrates real value, and
+  no existing passport is lost.
 
 ---
 
 ## Assumptions and decisions (stated for the reviewer)
 
-- The planner's scope block was present and authoritative; this spec
+- **The planner's scope block was present and authoritative;** this spec
   expands it directly and does not re-derive scope from the title.
-- **Co-occurrence is the primary similarity signal; genre-genre
-  relationships are a boost where MusicBrainz exposes them.** This hedges
-  the uncertainty about whether the WS/2 genre entity returns genre-rels,
-  without blocking. If it does, those edges strengthen the layout; if it
-  does not, co-occurrence alone still produces the atlas.
-- **The API, not the dumps.** Chosen for buildability and to satisfy
-  resumability with simple disk caching. Downloading multi-GB dumps is out
-  of scope and unnecessary.
-- **Canvas 2D over WebGL** for ~2,200 nodes, to keep first render and the
-  build simple; WebGL is permitted if the implementer prefers.
-- **Lit rendering with a seeded passport is in scope; the stamp
-  interaction is not** (see boundary clarifications). This is how the
-  differentiator is demonstrated on staging without building EPIC 2.
-- **First-run orientation, not the EPIC 5 walkthrough** (see boundary
-  clarifications), because stamping does not exist in this EPIC.
+- **iTunes exemplars are keyed by mbid, not atlas id,** so the previews
+  survive an atlas rebuild that renumbers genre ids; the client joins on
+  `genre.mbid`. The atlas pipeline and the exemplar pipeline stay
+  independent (separate scripts) so rebuilding one never forces the other.
+- **Selection plays; an explicit Stamp button stamps.** Tapping a node is
+  low-commitment (hear it); stamping is a deliberate second action, so a
+  tap never accidentally writes to the passport. This satisfies "touch to
+  hear, tap to stamp" without accidental stamps on a dense field of dots.
+- **Un-stamp is included** as the inverse of the core action, because a
+  mis-tap on ~2,200 small nodes is likely and an unrecoverable stamp would
+  make the artifact feel fragile. Bulk editing stays out of scope.
+- **The 100ms budget is met by preloading + synchronous feedback,** not by
+  assuming instant network audio: the preview URL is in memory, playback
+  starts inside the gesture, and the node highlight plus now-playing panel
+  appear the same tick. Actual buffering may take longer; the felt latency
+  does not.
+- **Partial preview coverage is expected and shown honestly** (per-genre
+  resting state in the UI, `coverage` in the data file). The long tail of
+  obscure genres will lack previews; the popular core (including the demo
+  genres) will not, which is what makes staging sing.
+- **No new backend, no new env, no key.** iTunes Search needs none; the
+  passport is browser-only. The app stays static, consistent with the
+  EPIC's non-goals.
+- **Canvas per-node keyboard selection is deferred,** not built: it is a
+  known limitation carried from EPIC 1. All DOM controls (passport, now
+  playing, export/import) are fully keyboard reachable with visible focus.
+</content>
+</invoke>

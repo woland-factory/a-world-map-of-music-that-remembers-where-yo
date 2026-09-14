@@ -49,3 +49,35 @@ export interface Atlas {
   regions: Region[];
   genres: EmittedGenre[];
 }
+
+// One line per completed genre in cache/exemplars.jsonl. A positive record
+// carries the resolved iTunes preview; a negative one records that no
+// preview exists so the genre is never refetched.
+export type ExemplarRecord =
+  | {
+      mbid: string;
+      name: string;
+      found: true;
+      trackTitle: string;
+      artist: string;
+      previewUrl: string;
+      artworkUrl?: string;
+    }
+  | { mbid: string; name: string; found: false };
+
+// A single emitted exemplar (positive only), keyed by mbid in the file.
+export interface Exemplar {
+  trackTitle: string;
+  artist: string;
+  previewUrl: string;
+  artworkUrl?: string;
+}
+
+// data/exemplars.json — the committed output the client joins on genre.mbid.
+export interface ExemplarsFile {
+  version: 1;
+  generated: string;
+  source: "iTunes Search API";
+  coverage: { total: number; withPreview: number };
+  exemplars: Record<string, Exemplar>;
+}

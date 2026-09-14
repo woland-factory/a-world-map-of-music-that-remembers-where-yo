@@ -12,6 +12,8 @@
     "build:atlas": "tsx pipeline/index.ts all",
     "atlas:fetch": "tsx pipeline/index.ts genres relations cooccurrence",
     "atlas:emit": "tsx pipeline/index.ts graph layout cluster emit",
+    "exemplars:fetch": "tsx pipeline/index.ts exemplars",
+    "exemplars:emit": "tsx pipeline/index.ts emit-exemplars",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"

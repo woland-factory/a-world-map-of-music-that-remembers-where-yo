@@ -1,6 +1,7 @@
 import { fetchArtistsByTag } from "./lib/mb.js";
 import { readJsonl, appendJsonl } from "./lib/jsonl.js";
 import { paths } from "./lib/paths.js";
+import { PRIORITY_GENRES } from "./lib/priority.js";
 import { loadGenresCache } from "./fetch-genres.js";
 import type { CooccurrenceRecord } from "./types.js";
 
@@ -16,16 +17,7 @@ export async function fetchCooccurrence(): Promise<void> {
   // Front-load a core set (the ground-truth genres the layout is judged on
   // and the demo passport) so a partial run still yields a meaningful,
   // testable map. The rest follow in cache order.
-  const PRIORITY = [
-    "black metal", "death metal", "thrash metal", "doom metal", "heavy metal",
-    "progressive metal", "power metal", "speed metal", "groove metal",
-    "jazz", "blues", "bebop", "swing", "hard bop", "cool jazz", "delta blues",
-    "chicago blues", "free jazz", "jazz fusion",
-    "progressive rock", "zeuhl", "krautrock", "psychedelic rock", "art rock",
-    "techno", "house", "deep house", "detroit techno", "trance", "ambient",
-    "drum and bass", "dub techno", "acid house", "minimal techno",
-  ];
-  const rank = new Map(PRIORITY.map((n, i) => [n, i] as const));
+  const rank = new Map(PRIORITY_GENRES.map((n, i) => [n, i] as const));
   const pending = cache.genres
     .filter((g) => !done.has(g.mbid))
     .sort((a, b) => {
