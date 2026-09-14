@@ -235,6 +235,234 @@ button.primary:hover {
   outline-offset: 2px;
 }
 
+/* Passport button, top-right, >=44px, with a live lit-count badge. */
+.passport-btn {
+  position: absolute;
+  right: calc(env(safe-area-inset-right, 0px) + 14px);
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+.passport-btn:hover {
+  border-color: var(--accent);
+}
+.pb-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #06222e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Now-playing panel: bottom-left, clearing the zoom controls at right. */
+.now-playing {
+  position: absolute;
+  left: 12px;
+  right: 76px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  z-index: 9;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 16px 14px;
+  backdrop-filter: blur(8px);
+}
+.np-title {
+  margin: 0 28px 4px 0;
+  font-size: 18px;
+  line-height: 1.2;
+}
+.np-track {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.35;
+}
+.np-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.np-stamped {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* Close affordance shared by the panel and the sheet. */
+.sheet-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.sheet-close:hover {
+  color: var(--text);
+}
+
+/* Secondary / ghost buttons. */
+button.ghost,
+.ps-actions button:not(.primary) {
+  appearance: none;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+button.ghost:hover,
+.ps-actions button:not(.primary):hover {
+  border-color: var(--accent);
+}
+
+/* Passport sheet: a bottom sheet on a phone, a centered dialog on desktop. */
+.passport-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+.ps-inner {
+  position: relative;
+  width: 100%;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px 16px 0 0;
+  padding: 18px 18px calc(env(safe-area-inset-bottom, 0px) + 18px);
+  backdrop-filter: blur(12px);
+}
+.ps-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.ps-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.ps-count {
+  margin: 2px 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.ps-empty {
+  padding: 24px 4px 28px;
+}
+.ps-empty h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+.ps-empty p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.ps-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+.ps-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.ps-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex: none;
+}
+.ps-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.ps-name {
+  font-weight: 600;
+}
+.ps-meta,
+.ps-date {
+  color: var(--muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps-remove {
+  appearance: none;
+  flex: none;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.ps-remove:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.ps-msg {
+  margin: 10px 0 0;
+  color: var(--accent);
+  font-size: 14px;
+}
+.ps-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.ps-actions .primary {
+  margin-left: auto;
+}
+
 @media (min-width: 700px) {
   .card {
     max-width: 380px;
@@ -247,5 +475,18 @@ button.primary:hover {
     right: auto;
     transform: translateX(-50%);
     width: min(92vw, 380px);
+  }
+  .now-playing {
+    left: auto;
+    right: 76px;
+    width: 360px;
+  }
+  .passport-sheet {
+    align-items: center;
+  }
+  .ps-inner {
+    width: min(92vw, 460px);
+    border-radius: 16px;
+    max-height: 80vh;
   }
 }

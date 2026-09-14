@@ -1,6 +1,8 @@
-import type { Atlas } from "../types";
+import type { Atlas, Genre } from "../types";
 import { BACKGROUND } from "./colors";
 import { computeRenderGenres, type RenderGenre } from "./lit";
+
+const TAP_RADIUS = 14; // comfortable touch target around a genre node
 
 export interface Viewport {
   scale: number;
@@ -139,6 +141,23 @@ export class MapRenderer {
   }
   private toScreenY(y: number): number {
     return y * this.vp.scale + this.vp.offsetY;
+  }
+
+  // Nearest genre within a tap radius of a screen point, or null. A linear
+  // scan over ~2,200 nodes is well under a frame, so no spatial index.
+  hitTest(screenX: number, screenY: number): Genre | null {
+    let best: Genre | null = null;
+    let bestDist = TAP_RADIUS * TAP_RADIUS;
+    for (const r of this.render) {
+      const dx = this.toScreenX(r.genre.x) - screenX;
+      const dy = this.toScreenY(r.genre.y) - screenY;
+      const d = dx * dx + dy * dy;
+      if (d <= bestDist) {
+        bestDist = d;
+        best = r.genre;
+      }
+    }
+    return best;
   }
 
   requestDraw(): void {

@@ -43,7 +43,7 @@
       <div id="orientation" class="orientation" hidden>
         <div class="card">
           <p class="lead">A map of every music genre. The places you explore light up.</p>
-          <p class="hint">Drag to explore. Pinch to zoom.</p>
+          <p class="hint">Tap a genre to hear it. Stamp the ones you love.</p>
           <button id="got-it" type="button" class="primary">Got it</button>
         </div>
       </div>
@@ -64,6 +64,48 @@
         </button>
         <ul id="legend-list"></ul>
       </aside>
+
+      <!-- Passport button (top-right), shows the lit count as a badge. -->
+      <button id="passport-btn" class="passport-btn" type="button" aria-label="Passport" aria-haspopup="dialog" hidden>
+        <span class="pb-label">Passport</span>
+        <span id="passport-count" class="pb-badge">0</span>
+      </button>
+
+      <!-- Now-playing panel: the selected genre, its track, and Stamp. -->
+      <section id="now-playing" class="now-playing" aria-live="polite" hidden>
+        <button id="np-close" class="sheet-close" type="button" aria-label="Close">&times;</button>
+        <h2 id="np-title" class="np-title"></h2>
+        <p id="np-track" class="np-track"></p>
+        <div class="np-actions">
+          <button id="np-stamp" class="primary" type="button">Stamp</button>
+          <span id="np-stamped" class="np-stamped" role="status" hidden></span>
+          <button id="np-remove" class="ghost" type="button" hidden>Remove stamp</button>
+        </div>
+      </section>
+
+      <!-- Passport sheet: the stamps you kept. -->
+      <div id="passport" class="passport-sheet" role="dialog" aria-modal="true" aria-labelledby="passport-heading" hidden>
+        <div class="ps-inner">
+          <header class="ps-header">
+            <h2 id="passport-heading">Passport</h2>
+            <button id="passport-close" class="sheet-close" type="button" aria-label="Close">&times;</button>
+          </header>
+          <p id="passport-countline" class="ps-count"></p>
+          <div id="passport-empty" class="ps-empty" hidden>
+            <h3>Your map is dark</h3>
+            <p>Tap a genre to hear it. Stamp the ones you love.</p>
+          </div>
+          <ul id="passport-list" class="ps-list"></ul>
+          <p id="passport-msg" class="ps-msg" role="status" hidden></p>
+          <div class="ps-actions">
+            <button id="passport-export" type="button">Export</button>
+            <button id="passport-import" type="button">Import</button>
+            <button id="passport-see" class="primary" type="button">See your map</button>
+          </div>
+          <input id="passport-file" type="file" accept="application/json" hidden />
+          <a id="passport-download" aria-hidden="true" hidden></a>
+        </div>
+      </div>
     </main>
 
     <script type="module" src="/src/main.ts"></script>

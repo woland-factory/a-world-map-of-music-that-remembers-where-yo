@@ -15,6 +15,15 @@ function visibleCopy(): string {
     "A map of 2197 music genres. 0 lit.", // aria-label template, worst case
     "A map of music genres. Loading.",
     "Regions",
+    // Strings built in TS (index.html is the only file scanned from disk).
+    "Silent for now. Stamp it to remember.", // now-playing resting state
+    "Stamped 2026-09-14", // stamped button state
+    "So What · Miles Davis", // stamp row track line (middot separator)
+    "0 of ~2,200 lit", // passport count line
+    "Passport restored.", // import success
+    "That file did not look like a passport. Pick a passport you exported here.", // import failure
+    "Remove stamp black metal", // row remove control aria-label
+    "Remove", // row remove control label
   ];
   return html + "\n" + dynamic.join("\n");
 }
