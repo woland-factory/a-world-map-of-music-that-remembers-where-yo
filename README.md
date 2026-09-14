@@ -3,12 +3,13 @@
 A living map of every music genre, built on open MusicBrainz data. Genres
 sit near the genres they sound like, so the map reads as a landscape:
 metal in one country, jazz and blues next door, electronic music across
-the way. The places you explore light up, so your own corner of music
-grows out of a mostly dark world.
+the way. Tap a genre to hear a 30-second preview, then stamp the ones you
+love. The places you explore light up, so your own corner of music grows
+out of a mostly dark world.
 
-This repository is the first milestone: the genre atlas and the map that
-renders it. Pan and zoom a dark, labeled map of roughly 2,200 genres, with
-a seeded demo passport that shows what a lit map looks like.
+Pan and zoom a dark, labeled map of roughly 2,200 genres. Touch anywhere
+to play it, stamp a genre to keep it, and watch your passport fill in. Your
+passport lives in your browser and exports to a file you own.
 
 ## How it works
 
@@ -16,9 +17,13 @@ a seeded demo passport that shows what a lit map looks like.
   with each genre, and any genre-to-genre relationships, then places every
   genre in 2-D by how often it shares artists with other genres. The result
   is committed as `data/genres.json`.
+- A second pipeline resolves one 30-second preview per genre from the
+  iTunes Search API and commits it as `data/exemplars.json`, keyed by genre
+  mbid. Coverage is partial by design and reported honestly in the file.
 - The web app is a static single page. It loads `data/genres.json` and
-  draws it on a canvas. A passport (a set of genre ids in your browser)
-  lights those genres in their region color.
+  draws it on a canvas, then loads `data/exemplars.json` in parallel for
+  audio. A passport (your stamps, stored in the browser) lights those
+  genres in their region color.
 
 ## Run it
 
@@ -65,13 +70,36 @@ re-running never refetches a genre that is already cached. Running only the
 compute step (`npm run atlas:emit`) rebuilds `data/genres.json` from the
 cache with no network calls.
 
+## Regenerate the previews
+
+The 30-second previews come from the iTunes Search API, which needs no key
+and no account:
+
+```bash
+npm install
+npm run exemplars:fetch   # resolve one preview per genre (resumable)
+npm run exemplars:emit    # write data/exemplars.json from the cache
+```
+
+The fetch stage is polite to iTunes (about 20 requests per minute), so a
+full pass takes a while. It is incremental and resumable: one line per
+genre is cached in `data/cache/exemplars.jsonl`, an interrupted run
+continues where it left off, and re-running refetches nothing already
+cached. Partial coverage is expected. Many obscure genres have no preview,
+and the app shows an honest resting state for those. The emit step rebuilds
+`data/exemplars.json` from the cache with no network calls.
+
 ## Contribute
 
-- `pipeline/` holds the offline build (fetch, graph, layout, cluster,
-  emit). See `pipeline/index.ts` for the stage orchestration.
+- `pipeline/` holds the offline build (genre fetch, graph, layout, cluster,
+  emit, and the separate iTunes exemplar stages). See `pipeline/index.ts`
+  for the stage orchestration.
 - `web/` holds the single-page app (`web/src/map` for the canvas renderer
-  and input, `web/src/state` for the passport and runtime config).
-- `data/` holds the committed atlas and the resumable pipeline cache.
+  and input, `web/src/audio` for playback, `web/src/ui` for the now-playing
+  panel and passport view, `web/src/state` for the passport, exemplars, and
+  runtime config).
+- `data/` holds the committed atlas, the exemplar previews, and the
+  resumable pipeline caches.
 
 Run the tests:
 
