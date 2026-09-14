@@ -272,6 +272,135 @@ button.primary:hover {
   font-weight: 700;
 }
 
+/* Daily dare: top-center, below the passport-button row so it clears it.
+   Collapses to a small pill so it never blocks the map. */
+.dare-card {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 66px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(92vw, 360px);
+  z-index: 9;
+}
+.dare-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+.dare-pill:hover {
+  border-color: var(--accent);
+}
+.dare-panel {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 16px 14px;
+  backdrop-filter: blur(10px);
+}
+.dare-collapse {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.dare-collapse:hover {
+  color: var(--text);
+}
+.dare-label {
+  margin: 0 0 4px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.dare-heading {
+  margin: 0 34px 6px 0;
+  font-size: 19px;
+  line-height: 1.2;
+}
+.dare-body,
+.dare-hint,
+.dare-track {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.dare-hint {
+  margin-bottom: 6px;
+}
+.dare-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.dare-play {
+  appearance: none;
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dare-play:hover {
+  border-color: var(--accent);
+}
+.dare-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dare-chip {
+  appearance: none;
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dare-chip:hover {
+  border-color: var(--accent);
+}
+.dare-streak {
+  margin: 10px 0 0;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+}
+.dare-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 /* Now-playing panel: bottom-left, clearing the zoom controls at right. */
 .now-playing {
   position: absolute;

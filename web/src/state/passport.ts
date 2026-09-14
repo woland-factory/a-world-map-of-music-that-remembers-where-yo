@@ -1,5 +1,16 @@
-import type { Atlas, Exemplar, ExemplarIndex, Genre, Passport, Stamp } from "../types";
+import type {
+  Atlas,
+  DailyDare,
+  Exemplar,
+  ExemplarIndex,
+  FrontierEvent,
+  Genre,
+  Passport,
+  Stamp,
+  Streak,
+} from "../types";
 import { seedDemoEnabled } from "./env";
+import { pickDare, updateStreak, yesterday } from "./dare";
 
 const PASSPORT_KEY = "passport";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -10,7 +21,16 @@ const MAX_TEXT = 120; // cap imported track/artist strings
 let byId = new Map<number, Genre>();
 let byMbid = new Map<string, Genre>();
 let atlasCount = 0;
-let current: Passport = { version: 2, stamps: [] };
+
+function emptyStreak(): Streak {
+  return { count: 0, lastCompleted: null };
+}
+
+function emptyPassport(): Passport {
+  return { version: 3, stamps: [], streak: emptyStreak(), frontierHistory: [], dare: null };
+}
+
+let current: Passport = emptyPassport();
 
 export function setAtlas(atlas: Atlas): void {
   byId = new Map(atlas.genres.map((g) => [g.id, g]));
@@ -36,6 +56,11 @@ export function formatLocalDate(d: Date): string {
 
 function today(): string {
   return formatLocalDate(new Date());
+}
+
+// The local calendar date, for callers outside this module (main wiring).
+export function todayString(): string {
+  return today();
 }
 
 function clip(v: unknown): string | undefined {
@@ -78,18 +103,74 @@ function dedupe(stamps: Stamp[]): Stamp[] {
   return out;
 }
 
-// Forward-migrate any stored shape to v2, dropping unresolvable stamps.
-// With mbidOnly (import), stamps resolve by mbid alone.
+// Validate a stored streak: non-negative integer count, a valid date or null.
+function migrateStreak(raw: unknown): Streak {
+  if (!raw || typeof raw !== "object") return emptyStreak();
+  const r = raw as Record<string, unknown>;
+  const count =
+    typeof r.count === "number" && Number.isFinite(r.count) ? Math.max(0, Math.floor(r.count)) : 0;
+  const lastCompleted =
+    typeof r.lastCompleted === "string" && DATE_RE.test(r.lastCompleted) ? r.lastCompleted : null;
+  return { count, lastCompleted };
+}
+
+// Resolve stored frontier events against the atlas (mbid is authority),
+// dropping the unresolvable, deduping per date+genre, capped at atlas size.
+function migrateFrontier(raw: unknown, mbidOnly: boolean): FrontierEvent[] {
+  if (!Array.isArray(raw)) return [];
+  const out: FrontierEvent[] = [];
+  const seen = new Set<string>();
+  for (const e of raw.slice(0, Math.max(atlasCount, 1))) {
+    if (!e || typeof e !== "object") continue;
+    const r = e as Record<string, unknown>;
+    let genre: Genre | undefined;
+    if (typeof r.mbid === "string" && byMbid.has(r.mbid)) genre = byMbid.get(r.mbid);
+    else if (!mbidOnly && Number.isInteger(r.genreId) && byId.has(r.genreId as number))
+      genre = byId.get(r.genreId as number);
+    if (!genre) continue;
+    if (typeof r.date !== "string" || !DATE_RE.test(r.date)) continue;
+    const key = `${r.date}:${genre.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ genreId: genre.id, mbid: genre.mbid, date: r.date });
+  }
+  return out;
+}
+
+// Keep a pinned dare only if its genre resolves and its date is valid.
+function migrateDare(raw: unknown, mbidOnly: boolean): DailyDare | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  let genre: Genre | undefined;
+  if (typeof r.mbid === "string" && byMbid.has(r.mbid)) genre = byMbid.get(r.mbid);
+  else if (!mbidOnly && Number.isInteger(r.genreId) && byId.has(r.genreId as number))
+    genre = byId.get(r.genreId as number);
+  if (!genre) return null;
+  if (typeof r.date !== "string" || !DATE_RE.test(r.date)) return null;
+  return { date: r.date, genreId: genre.id, mbid: genre.mbid, done: r.done === true };
+}
+
+// Forward-migrate any stored shape (v3/v2/v1/corrupt) to v3, dropping
+// unresolvable data. With mbidOnly (import), everything resolves by mbid
+// alone. v2 and v1 have no streak/frontier/dare, so those default to empty.
 export function migratePassport(raw: unknown, mbidOnly = false): Passport {
-  if (!raw || typeof raw !== "object") return { version: 2, stamps: [] };
+  if (!raw || typeof raw !== "object") return emptyPassport();
   const r = raw as Record<string, unknown>;
 
   if (Array.isArray(r.stamps)) {
-    const stamps = r.stamps
-      .slice(0, Math.max(atlasCount, 1))
-      .map((s) => resolveStamp(s, mbidOnly))
-      .filter((s): s is Stamp => s !== null);
-    return { version: 2, stamps: dedupe(stamps) };
+    const stamps = dedupe(
+      r.stamps
+        .slice(0, Math.max(atlasCount, 1))
+        .map((s) => resolveStamp(s, mbidOnly))
+        .filter((s): s is Stamp => s !== null),
+    );
+    return {
+      version: 3,
+      stamps,
+      streak: migrateStreak(r.streak),
+      frontierHistory: migrateFrontier(r.frontierHistory, mbidOnly),
+      dare: migrateDare(r.dare, mbidOnly),
+    };
   }
 
   // Legacy v1: { lit: number[] } -> dated stamps with no track fields.
@@ -100,10 +181,16 @@ export function migratePassport(raw: unknown, mbidOnly = false): Passport {
       const g = Number.isInteger(id) ? byId.get(id as number) : undefined;
       if (g) stamps.push({ genreId: g.id, mbid: g.mbid, date: t });
     }
-    return { version: 2, stamps: dedupe(stamps) };
+    return {
+      version: 3,
+      stamps: dedupe(stamps),
+      streak: emptyStreak(),
+      frontierHistory: [],
+      dare: null,
+    };
   }
 
-  return { version: 2, stamps: [] };
+  return emptyPassport();
 }
 
 export function readPassport(): Passport | null {
@@ -142,13 +229,71 @@ export function addStamp(genreId: number, exemplar?: Exemplar): Passport {
   const stamp: Stamp = { genreId: g.id, mbid: g.mbid, date: today() };
   if (exemplar?.trackTitle) stamp.trackTitle = clip(exemplar.trackTitle);
   if (exemplar?.artist) stamp.artist = clip(exemplar.artist);
-  current = { version: 2, stamps: [...current.stamps, stamp] };
+  // Preserve streak, frontier history, and the pinned dare across a stamp.
+  current = { ...current, version: 3, stamps: [...current.stamps, stamp] };
   writePassport(current);
   return current;
 }
 
+// Un-stamping un-lights a dot but never rolls back the streak or the frontier
+// history: those record that you did explore that day, honestly.
 export function removeStamp(genreId: number): Passport {
-  current = { version: 2, stamps: current.stamps.filter((s) => s.genreId !== genreId) };
+  current = { ...current, version: 3, stamps: current.stamps.filter((s) => s.genreId !== genreId) };
+  writePassport(current);
+  return current;
+}
+
+export function getStreak(): Streak {
+  return current.streak;
+}
+
+export function getFrontierHistory(): FrontierEvent[] {
+  return current.frontierHistory;
+}
+
+export function getDare(): DailyDare | null {
+  return current.dare;
+}
+
+// Pin today's dare into the passport so it is stable across a mid-day lit
+// change and across reload. Recomputes only when the calendar day changes or
+// the pinned genre no longer resolves. Marks it done when its genre is lit
+// (for example stamped from the map). Persists synchronously.
+export function ensureDare(
+  atlas: Atlas,
+  exemplars: ExemplarIndex,
+  todayStr: string = today(),
+): DailyDare | null {
+  const stamped = litSet(current);
+  const d = current.dare;
+  if (d && d.date === todayStr && byId.has(d.genreId)) {
+    if (stamped.has(d.genreId) && !d.done) {
+      current = { ...current, dare: { ...d, done: true } };
+      writePassport(current);
+    }
+    return current.dare;
+  }
+  const picked = pickDare(atlas, stamped, stamped, exemplars, todayStr);
+  const dare: DailyDare | null = picked
+    ? { date: todayStr, genreId: picked.id, mbid: picked.mbid, done: false }
+    : null;
+  current = { ...current, dare };
+  writePassport(current);
+  return dare;
+}
+
+// Complete today's dare exactly once: bump the streak (idempotent per day),
+// append one frontier crossing (deduped per date+genre), mark the dare done.
+// A no-op when there is no matching, unfinished dare.
+export function completeDare(genreId: number, todayStr: string = today()): Passport {
+  const p = current;
+  if (!p.dare || p.dare.genreId !== genreId || p.dare.done) return current;
+  const streak = updateStreak(p.streak, todayStr);
+  const frontierHistory = p.frontierHistory.slice();
+  if (!frontierHistory.some((e) => e.date === todayStr && e.genreId === genreId)) {
+    frontierHistory.push({ genreId, mbid: p.dare.mbid, date: todayStr });
+  }
+  current = { ...p, version: 3, streak, frontierHistory, dare: { ...p.dare, done: true } };
   writePassport(current);
   return current;
 }
@@ -209,6 +354,34 @@ export function buildSeedStamps(
   return stamps;
 }
 
+// Build the full v3 demo passport from genre names: dated stamps plus a small
+// synthesized streak and frontier history so staging shows a live streak
+// (lastCompleted = yesterday) and an obvious frontier to cross. Deterministic
+// in (names, base). Returns null when no name resolves.
+export function buildSeedPassport(
+  atlas: Atlas,
+  names: string[],
+  exemplars: ExemplarIndex,
+  base: Date,
+): Passport | null {
+  const stamps = buildSeedStamps(atlas, names, exemplars, base);
+  if (stamps.length === 0) return null;
+  const t = formatLocalDate(base);
+  const frontierHistory: FrontierEvent[] = [];
+  for (let i = 0; i < Math.min(3, stamps.length); i++) {
+    const d = new Date(base);
+    d.setDate(d.getDate() - (1 + i)); // newest crossing is yesterday
+    frontierHistory.push({ genreId: stamps[i].genreId, mbid: stamps[i].mbid, date: formatLocalDate(d) });
+  }
+  return {
+    version: 3,
+    stamps,
+    streak: { count: 3, lastCompleted: yesterday(t) },
+    frontierHistory,
+    dare: null, // ensureDare computes today's dare from the seeded territory
+  };
+}
+
 async function loadDemoNames(): Promise<string[]> {
   try {
     const res = await fetch("/data/demo-passport.json", { cache: "no-store" });
@@ -236,13 +409,13 @@ export async function resolveInitialPassport(
   if (seedDemoEnabled()) {
     const names = await loadDemoNames();
     const index = exemplars ? await exemplars.catch(() => new Map<string, Exemplar>()) : new Map();
-    const stamps = buildSeedStamps(atlas, names, index, new Date());
-    if (stamps.length > 0) {
-      current = { version: 2, stamps };
+    const seeded = buildSeedPassport(atlas, names, index, new Date());
+    if (seeded) {
+      current = seeded;
       writePassport(current);
       return current;
     }
   }
-  current = { version: 2, stamps: [] };
+  current = emptyPassport();
   return current;
 }

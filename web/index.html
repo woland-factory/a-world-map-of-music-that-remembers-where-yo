@@ -71,6 +71,21 @@
         <span id="passport-count" class="pb-badge">0</span>
       </button>
 
+      <!-- Daily dare: one new sound a day from the edge of your territory.
+           Collapsible to a small pill so it never blocks the map. Its inner
+           text is built in TS and set with textContent. -->
+      <section id="dare" class="dare-card" aria-label="Today's dare" hidden>
+        <button id="dare-pill" class="dare-pill" type="button" aria-label="Show dare" hidden>
+          Today's dare
+        </button>
+        <div id="dare-panel" class="dare-panel">
+          <button id="dare-collapse" class="dare-collapse" type="button" aria-label="Hide dare">
+            <span aria-hidden="true">&times;</span>
+          </button>
+          <div id="dare-content" aria-live="polite"></div>
+        </div>
+      </section>
+
       <!-- Now-playing panel: the selected genre, its track, and Stamp. -->
       <section id="now-playing" class="now-playing" aria-live="polite" hidden>
         <button id="np-close" class="sheet-close" type="button" aria-label="Close">&times;</button>

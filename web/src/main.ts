@@ -12,10 +12,16 @@ import {
   exportPassport,
   isStamped,
   stampFor,
+  ensureDare,
+  completeDare,
+  getDare,
+  todayString,
 } from "./state/passport";
 import { loadExemplars, getExemplar } from "./state/exemplars";
+import { darePreviewUrl } from "./state/dare";
 import { Player } from "./audio/player";
 import { NowPlaying } from "./ui/nowPlaying";
+import { DareCard } from "./ui/dareCard";
 import { PassportView } from "./ui/passportView";
 import { countLit } from "./map/lit";
 import { hideSkeleton, showError, maybeShowOrientation } from "./ui/states";
@@ -64,6 +70,8 @@ async function start(): Promise<void> {
   });
 
   const passport = await resolveInitialPassport(atlas, exemplarsPromise);
+  const todayStr = todayString();
+  const byId = new Map(atlas.genres.map((g) => [g.id, g]));
   const renderer = new MapRenderer(canvas, atlas, litSet(passport));
   renderer.resize();
   renderer.fit();
@@ -91,10 +99,15 @@ async function start(): Promise<void> {
     };
   };
 
+  let dareCard: DareCard | undefined;
+
   const nowPlaying = new NowPlaying(el("now-playing"), {
     onStamp: () => {
       if (!selected) return;
       addStamp(selected.id, getExemplar(exemplars, selected));
+      // Stamping the dare's genre from the map completes the dare too, so the
+      // streak and frontier history update exactly once.
+      if (getDare()?.genreId === selected.id) completeDare(selected.id, todayStr);
       applyPassportChange();
       nowPlaying.setStamped(true, stampFor(selected.id)?.date);
     },
@@ -113,6 +126,12 @@ async function start(): Promise<void> {
     renderer.setLit(litSet(getPassport()));
     updateAriaLabel();
     passportView.refresh();
+    // Keep today's dare in sync: pin one when territory first lights, and mark
+    // it done when its genre was just stamped. Idempotent when already pinned.
+    if (dareCard) {
+      ensureDare(atlas, exemplars, todayStr);
+      dareCard.render();
+    }
   };
 
   passportView = new PassportView(document, {
@@ -130,6 +149,10 @@ async function start(): Promise<void> {
       if (result.ok) {
         renderer.setLit(litSet(getPassport()));
         updateAriaLabel();
+        if (dareCard) {
+          ensureDare(atlas, exemplars, todayStr);
+          dareCard.render();
+        }
         if (selected) nowPlaying.setStamped(isStamped(selected.id), stampFor(selected.id)?.date);
       }
       return result.ok;
@@ -174,6 +197,7 @@ async function start(): Promise<void> {
     if (e.key !== "Escape") return;
     if (passportView.isOpen) passportView.close();
     else if (nowPlaying.visible) deselect();
+    else if (dareCard?.isExpanded) dareCard.collapse();
   });
 
   const legend = el("legend");
@@ -184,6 +208,51 @@ async function start(): Promise<void> {
 
   hideSkeleton();
   maybeShowOrientation();
+
+  // The dare is computed once exemplars resolve so it can prefer a playable
+  // neighbor. It never blocks the map, which is already interactive above.
+  exemplars = await exemplarsPromise.catch(() => new Map());
+  ensureDare(atlas, exemplars, todayStr);
+
+  // Warm the dare's preview the moment it is known so the first Play is
+  // instant. Called on load and after a starter pick, never on passport reads.
+  const warmDare = (): void => {
+    const url = darePreviewUrl(getPassport(), exemplars, atlas);
+    if (url) player.warm(url);
+  };
+
+  dareCard = new DareCard(el("dare"), {
+    atlas,
+    getPassport,
+    getExemplars: () => exemplars,
+    today: () => todayStr,
+    onPlay: (genre, ex) => {
+      setHook(genre, true, true);
+      player.play(ex.previewUrl);
+    },
+    onStampDare: () => {
+      const dare = getDare();
+      if (!dare) return;
+      const genre = byId.get(dare.genreId);
+      addStamp(dare.genreId, genre ? getExemplar(exemplars, genre) : undefined);
+      completeDare(dare.genreId, todayStr);
+      applyPassportChange();
+      if (selected && selected.id === dare.genreId)
+        nowPlaying.setStamped(true, stampFor(dare.genreId)?.date);
+    },
+    onPickStarter: (genreId) => {
+      const genre = byId.get(genreId);
+      addStamp(genreId, genre ? getExemplar(exemplars, genre) : undefined);
+      applyPassportChange(); // ensures a fresh dare from the newly lit start
+      warmDare();
+    },
+    onSeeMap: () => {
+      renderer.fit();
+      dareCard?.collapse();
+    },
+  });
+  dareCard.render();
+  warmDare();
 
   let resizeTimer = 0;
   window.addEventListener("resize", () => {

@@ -24,6 +24,25 @@ function visibleCopy(): string {
     "That file did not look like a passport. Pick a passport you exported here.", // import failure
     "Remove stamp black metal", // row remove control aria-label
     "Remove", // row remove control label
+    // Dare card strings (built in ui/dareCard.ts; placeholders filled in).
+    "Where do you want to start?", // starter heading
+    "Pick a sound you love. We dare you one step past it.", // starter body
+    "Start with jazz", // starter chip aria-label
+    "Today's dare", // dare label + collapsed pill label
+    "Next to jazz on your map.", // dare border hint
+    "Silent for now. Stamp it to cross the frontier.", // dare resting line
+    "Play", // dare play control label
+    "Play the dare", // dare play control aria-label
+    "Stamp it", // dare primary action
+    "3-day streak", // streak line (hyphen allowed)
+    "Frontier moved.", // done heading
+    "You crossed into techno.", // done body
+    "New dare tomorrow.", // done note
+    "See your map", // done / no-frontier action
+    "You reached every neighbor.", // no-frontier heading
+    "Tap the map to leap somewhere new.", // no-frontier body
+    "Hide dare", // collapse control aria-label (expanded)
+    "Show dare", // collapse control aria-label (collapsed)
   ];
   return html + "\n" + dynamic.join("\n");
 }

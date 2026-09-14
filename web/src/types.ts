@@ -50,9 +50,34 @@ export interface Stamp {
   artist?: string;
 }
 
+// One completed dare: a crossing from lit territory into a new genre.
+export interface FrontierEvent {
+  genreId: number;
+  mbid: string; // stable across atlas rebuilds (join key on import)
+  date: string; // "YYYY-MM-DD" local, the day the crossing happened
+}
+
+// A consecutive-day streak of completed dares.
+export interface Streak {
+  count: number; // consecutive calendar days a dare was completed
+  lastCompleted: string | null; // "YYYY-MM-DD" of the most recent completion
+}
+
+// Today's pinned dare. Pinned so it is stable across a mid-day lit change
+// and across reload; recomputed only when the calendar day changes.
+export interface DailyDare {
+  date: string; // the calendar day this dare belongs to
+  genreId: number;
+  mbid: string;
+  done: boolean; // completed (stamped) today
+}
+
 export interface Passport {
-  version: 2;
+  version: 3;
   stamps: Stamp[]; // at most one per genre; genreId unique
+  streak: Streak;
+  frontierHistory: FrontierEvent[]; // ordered log of crossings
+  dare: DailyDare | null; // recomputed when the calendar day changes
 }
 
 export interface AppEnv {
