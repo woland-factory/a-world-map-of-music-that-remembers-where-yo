@@ -11,6 +11,12 @@ Pan and zoom a dark, labeled map of roughly 2,200 genres. Touch anywhere
 to play it, stamp a genre to keep it, and watch your passport fill in. Your
 passport lives in your browser and exports to a file you own.
 
+Each day the map dares you one step past your borders: it picks one new
+genre next to your lit territory, plays its preview, and one tap stamps it
+and pushes the frontier into the dark. Coming back on consecutive days
+builds a streak. Your streak and every crossing are saved in the same
+browser-local passport.
+
 ## How it works
 
 - An offline pipeline reads the MusicBrainz genre list, the artists tagged
@@ -24,6 +30,10 @@ passport lives in your browser and exports to a file you own.
   draws it on a canvas, then loads `data/exemplars.json` in parallel for
   audio. A passport (your stamps, stored in the browser) lights those
   genres in their region color.
+- The daily dare is derived at load from the same data: it reads the local
+  calendar date, finds the genres adjacent to your lit ones, and picks one
+  deterministically, so the dare is identical all day and changes the next.
+  Nothing runs in the background and no clock beyond the local date is used.
 
 ## Run it
 
@@ -96,8 +106,8 @@ and the app shows an honest resting state for those. The emit step rebuilds
   for the stage orchestration.
 - `web/` holds the single-page app (`web/src/map` for the canvas renderer
   and input, `web/src/audio` for playback, `web/src/ui` for the now-playing
-  panel and passport view, `web/src/state` for the passport, exemplars, and
-  runtime config).
+  panel, passport view, and dare card, `web/src/state` for the passport,
+  the daily dare logic, exemplars, and runtime config).
 - `data/` holds the committed atlas, the exemplar previews, and the
   resumable pipeline caches.
 
