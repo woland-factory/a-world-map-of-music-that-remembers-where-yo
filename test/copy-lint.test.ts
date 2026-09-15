@@ -43,6 +43,26 @@ function visibleCopy(): string {
     "Tap the map to leap somewhere new.", // no-frontier body
     "Hide dare", // collapse control aria-label (expanded)
     "Show dare", // collapse control aria-label (collapsed)
+    // ListenBrainz proxy errors (built in server/app.mjs).
+    "That name has a character ListenBrainz skips. Check it, or tap any genre to stamp it yourself.",
+    "ListenBrainz can't find that name. Check the spelling, or tap any genre to stamp it yourself.",
+    "Lots of lookups right now. Wait a minute and try again.",
+    "ListenBrainz didn't answer. Try again in a moment.",
+    "The lookup broke on our side. Try again in a moment.",
+    "Check the address and try again.",
+    // Fill-from-ListenBrainz messages (built in state/listenbrainz.ts).
+    "Type a ListenBrainz name first, or tap any genre to stamp it yourself.",
+    "Looking up your genres.",
+    "ListenBrainz is still adding up your stats. Try again later, or tap any genre to stamp it yourself.",
+    "Your stats use tags this map skips. Tap any genre to stamp it yourself.",
+    "Your map already shows those genres.",
+    "Lit 1 new genre from your travels.",
+    "Lit 24 new genres from your travels.",
+    // Poster strings (built in poster/poster.ts and ui/posterModal.ts).
+    "A world map of music", // poster title
+    "412 of 2,197 genres lit", // poster count line
+    "September 15, 2026 · music.example.org", // poster footer (middot separator)
+    "The poster didn't print. Close this and try again.", // toBlob failure
   ];
   return html + "\n" + dynamic.join("\n");
 }

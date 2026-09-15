@@ -112,13 +112,40 @@
           </div>
           <ul id="passport-list" class="ps-list"></ul>
           <p id="passport-msg" class="ps-msg" role="status" hidden></p>
+          <section class="ps-fill" aria-labelledby="lb-heading">
+            <h3 id="lb-heading">Fill from ListenBrainz</h3>
+            <p class="ps-hint">Stamps the genres your public stats show. Looked up once, never stored.</p>
+            <form id="lb-form">
+              <label for="lb-name">ListenBrainz name</label>
+              <input id="lb-name" type="text" autocomplete="off" spellcheck="false" maxlength="64" placeholder="e.g. rob" />
+              <button id="lb-fill" class="primary" type="submit">Light my map</button>
+            </form>
+            <p id="lb-status" class="ps-msg" role="status" aria-live="polite" hidden></p>
+          </section>
           <div class="ps-actions">
             <button id="passport-export" type="button">Export</button>
             <button id="passport-import" type="button">Import</button>
+            <button id="poster-open" type="button">Make a poster</button>
             <button id="passport-see" class="primary" type="button">See your map</button>
           </div>
           <input id="passport-file" type="file" accept="application/json" hidden />
           <a id="passport-download" aria-hidden="true" hidden></a>
+        </div>
+      </div>
+
+      <!-- Poster modal: a client-drawn PNG of the lit map. Sits above the
+           passport sheet in z-order; Escape closes it first. -->
+      <div id="poster" class="poster-modal" role="dialog" aria-modal="true" aria-labelledby="poster-heading" hidden>
+        <div class="poster-inner">
+          <header>
+            <h2 id="poster-heading">Your poster</h2>
+            <button id="poster-close" class="sheet-close" type="button" aria-label="Close">&times;</button>
+          </header>
+          <p id="poster-wait" role="status">Printing your map.</p>
+          <img id="poster-img" alt="Poster of your lit map" hidden />
+          <div class="poster-actions">
+            <button id="poster-download" class="primary" type="button" hidden>Download PNG</button>
+          </div>
         </div>
       </div>
     </main>

@@ -1,5 +1,6 @@
 import type { Atlas, Genre, Passport } from "../types";
 import { regionColor } from "../map/colors";
+import { FILL_MESSAGES, type FillResult } from "../state/listenbrainz";
 
 const APPROX_TOTAL = "~2,200";
 
@@ -10,6 +11,8 @@ export interface PassportViewDeps {
   onRemove: (genreId: number) => void;
   onImport: (text: string) => boolean;
   onSeeMap: () => void;
+  onFill: (name: string) => Promise<FillResult>;
+  onPoster: () => void;
 }
 
 // The passport sheet: the list of stamps, the lit count, export/import, and
@@ -24,6 +27,9 @@ export class PassportView {
   private msg: HTMLElement;
   private fileInput: HTMLInputElement;
   private download: HTMLAnchorElement;
+  private lbName: HTMLInputElement;
+  private lbFill: HTMLButtonElement;
+  private lbStatus: HTMLElement;
   private byId: Map<number, Genre>;
   private lastFocus: HTMLElement | null = null;
 
@@ -48,6 +54,14 @@ export class PassportView {
       this.deps.onSeeMap();
     });
     this.fileInput.addEventListener("change", () => this.doImport());
+    this.lbName = root.getElementById("lb-name") as HTMLInputElement;
+    this.lbFill = root.getElementById("lb-fill") as HTMLButtonElement;
+    this.lbStatus = root.getElementById("lb-status")!;
+    root.getElementById("lb-form")!.addEventListener("submit", (e) => {
+      e.preventDefault();
+      void this.doFill();
+    });
+    root.getElementById("poster-open")!.addEventListener("click", () => this.deps.onPoster());
     this.sheet.addEventListener("keydown", (e) => {
       if (e.key === "Escape") this.close();
     });
@@ -129,6 +143,22 @@ export class PassportView {
 
   get isOpen(): boolean {
     return !this.sheet.hidden;
+  }
+
+  // Busy feedback lands synchronously (well within 100ms of the click);
+  // the button stays disabled until the lookup settles so a double tap
+  // can never race two fills.
+  private async doFill(): Promise<void> {
+    if (this.lbFill.disabled) return;
+    this.lbFill.disabled = true;
+    this.lbStatus.textContent = FILL_MESSAGES.busy;
+    this.lbStatus.hidden = false;
+    try {
+      const result = await this.deps.onFill(this.lbName.value);
+      this.lbStatus.textContent = result.message;
+    } finally {
+      this.lbFill.disabled = false;
+    }
   }
 
   private doExport(): void {

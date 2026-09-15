@@ -1,639 +1,520 @@
-# EPIC SPEC — Hear it, stamp it (the passport)
+# EPIC SPEC: Auto-fill from ListenBrainz, and the shareable poster
 
-## What this EPIC proves
+Expand of the planner's EPIC 4 scope. Two deliverables:
 
-EPIC 1 shipped the atlas: 2,197 genres laid out as a dark, pannable,
-zoomable map, with lit rendering driven by a passport that only a demo
-seeder could write. This EPIC makes the map **alive and yours**. Two
-things become true for the first time:
+1. A thin, rate-limited, input-validated backend proxy,
+   `GET /api/listenbrainz/:username`, that fetches a user's public
+   ListenBrainz genre-activity stats and returns the genres that match the
+   atlas. The client turns those into ordinary passport stamps, lighting
+   the map in seconds.
+2. "Make a poster": a client-side PNG of the lit map, previewed in a modal
+   and downloadable. No account, no upload, no server involvement.
 
-1. **You can hear it.** Touch any genre and a 30-second preview plays,
-   sourced from cached iTunes previews resolved offline at build time.
-2. **You can keep it.** Tap Stamp and that genre lights in color, pinned
-   to the track and the day that earned it, saved in the browser and
-   exportable as a file you own.
+This is the first EPIC that adds a runtime backend. Everything else in the
+product stays static and browser-local.
 
-The signature moment (the zoom-out: your glowing neighborhoods against a
-dark world) becomes reachable through real user action, not a seed. This
-EPIC turns a beautiful read-only map into the durable personal artifact
-the whole product exists to build.
+## Quality differentiator (restated, binding)
 
-## Quality differentiator (this app must win here)
-
-**Delight through tactility: an instant, alive map you can hear.** Touch
+Delight through tactility: an instant, alive map you can hear. Touch
 anywhere and it plays, your own territory glows out of the dark, and the
-frontier visibly moves when you cross it. Every incumbent (Every Noise,
-musicmap, Music-Map, volt.fm) is frozen, silent, stateless, or a list. We
-win on the felt experience of a map you can hear and a world you are
-visibly filling in.
+frontier visibly moves when you cross it.
 
-**What it demands of THIS EPIC:** this is the EPIC where the
-differentiator stops being a promise. It owns the two pillars EPIC 1
-could only stage with a fake seed:
-
-- **You can hear it, instantly.** A tap must produce sound with no
-  perceptible wait. The preview URL is already in memory (loaded from a
-  committed data file), playback starts inside the tap gesture, and
-  visual feedback appears within 100ms no matter how fast the audio
-  buffers. A tap that spins, stalls, or needs a network lookup before it
-  plays fails the differentiator even if every checkbox is green.
-- **The frontier moves when you cross it.** Stamping must light the
-  genre in its region color *immediately* (optimistic), and that light
-  must survive a reload. The felt loop is: touch, hear, stamp, watch
-  your corner brighten.
-
-A silent tap, a laggy stamp, or a passport that forgets on reload is a
-differentiator failure, not a minor bug.
-
----
+What it demands of THIS EPIC: the fill must feel like the map catching
+fire, not like a form submission. The button gives feedback within 100ms,
+the stamps land in one batch (one repaint, one storage write), and on
+success the view frames the zoom-out so the newly lit territory is the
+first thing the user sees. The poster is the same glow, made portable:
+lit dots glowing out of the dark at print size, generated in under a
+second, with zero network traffic.
 
 ## Scope
 
-### In scope
+In scope:
 
-1. **Exemplar pipeline.** A committed, offline, incremental and resumable
-   build stage that resolves **one iTunes preview per genre where one
-   exists** and emits a committed `data/exemplars.json`. Honors a polite
-   iTunes rate (~20 requests/min). Partial coverage is valid and flagged.
-2. **Hear a genre.** Tapping a genre node on the map selects it, plays its
-   30-second preview instantly, and reveals a "now playing" panel with the
-   track and artist. A genre with no exemplar shows an honest resting
-   state, never a broken player.
-3. **Stamp a genre.** An explicit Stamp action lights the genre in its
-   region color immediately (optimistic) and records a stamp with the
-   first-listen date and the track that earned it. Persisted in browser
-   storage; survives reload. A stamp can be removed (the inverse of the
-   core action, so a mis-tap is recoverable).
-4. **The passport view.** A panel listing every stamp with its
-   first-listen date and the track that earned it, a "N of ~2,200 lit"
-   count, a designed empty state, and a one-tap "See your map" that frames
-   the zoom-out signature moment. Works from the first three stamps.
-5. **Export and import.** One click exports the passport as a JSON file
-   the user downloads; import restores it. Passport data never leaves the
-   browser except that downloaded file. Import validates at the boundary.
-6. **Passport v2 data model and migration.** Extend the stored passport
-   from a bare id list to dated stamps with track metadata, migrating any
-   existing v1 passport (and the demo seed) forward without data loss.
-7. Mobile-first, accessible, designed states, copy sweep clean, README
-   and `.env.example` updated for the new pipeline stage.
+- New `server/` directory: a zero-dependency Node service (ESM
+  JavaScript, Node 22 built-in `fetch` and `http`) exposing
+  `GET /api/listenbrainz/:username` and `GET /healthz`.
+- Infra wiring: an `api` build target in the Dockerfile, an `api` service
+  in all three compose files, an nginx `location /api/` proxy block, and a
+  vite dev-server proxy for `/api`.
+- Passport sheet additions: a "Fill from ListenBrainz" section (input +
+  button + status line) and a "Make a poster" action.
+- Poster module: pure layout/draw code plus a modal with preview and
+  Download PNG.
+- Batch stamp application in `web/src/state/passport.ts` (one storage
+  write for N stamps).
+- Copy, tests (unit, integration, e2e with mocked `/api`), README update,
+  copy-lint additions.
 
-### Out of scope (non-goals — binding)
+Out of scope (binding non-goals, from the planner):
 
-- **No daily dare.** No "today's genre", no date-seeded suggestion, no
-  frontier/streak logic. That is EPIC 3. Do not add `streak`,
-  `frontierHistory`, or a dare surface, even though the passport model
-  will later grow them.
-- **No ListenBrainz auto-fill.** No username entry, no
-  `GET /api/listenbrainz/:username`, no backend proxy route, no
-  auto-stamping from listening data. That is EPIC 4. This EPIC's app stays
-  static (the only server is the static file server).
-- **No accounts, login, or server-side storage of any kind.** The
-  passport is local and portable.
-- **No shareable poster / PNG export.** JSON export/import only. The
-  poster is EPIC 4.
-- **No first-run guided walkthrough.** The skippable orientation card from
-  EPIC 1 stays as-is; do not build the multi-step guided success path
-  (EPIC 5). See boundary clarifications.
-- **No full-track playback or streaming.** 30-second iTunes previews only.
-- **No runtime LLM, no genre blurbs.**
-- **No in-app taxonomy editing, no user-submitted genres.**
+- No Spotify OAuth or connect. The word Spotify must not appear in the UI.
+- No Spotify data-export import in V1. It stays a recorded follow-up in
+  the product plan; do not build any part of it.
+- No server-side storage of any imported data. The proxy's response cache
+  is in-memory only, dies with the process, and never touches disk.
+- No account creation, no login, no server-side profiles.
+- Also out: persisting the typed username anywhere (server logs, server
+  disk, client localStorage), LB OAuth/tokens (public stats only), and
+  any new npm dependency for the server.
 
-### Boundary clarifications (read before building)
+## Verified external contract (checked live, 2026-09-15)
 
-These sit exactly on the fence. Build them as written.
+`GET https://api.listenbrainz.org/1/stats/user/{user_name}/genre-activity`
 
-- **Hear-and-stamp is in scope; the dare is not.** Selecting a genre plays
-  it and reveals a Stamp button; stamping lights it and records the stamp.
-  What stays out is any *suggestion* of where to go next: no dare card, no
-  "try this neighbor", no frontier advancement prompt. The user drives
-  every selection by touching the map themselves.
-- **Un-stamp is in scope; bulk editing is not.** A single stamp can be
-  removed (from the now-playing panel or the passport view) so a mis-tap
-  is recoverable. Do not build multi-select, bulk clear, undo history, or
-  a "reset passport" beyond what import naturally does by replacing state.
-- **First-run orientation stays as EPIC 1 shipped it.** QUALITY BAR §4's
-  guided-success walkthrough is EPIC 5 and needs the dare loop to be
-  meaningful. Now that stamping exists, keep the existing one-time
-  orientation card; you MAY update its second line to point at the new
-  core action (hear + stamp) since that is now reachable, but do NOT build
-  a multi-step highlighted path. Building it here is drift into EPIC 5.
-
----
+- 200 body: `{"payload": {"genre_activity": [{"genre": "ambient",
+  "hour": 0, "listen_count": 405}, ...], "range": "all_time", ...}}`.
+  Genre names are lowercase MusicBrainz genre tags, the same vocabulary as
+  the atlas. One row per (genre, hour of day); sum `listen_count` across
+  hours per genre.
+- 204: stats not yet calculated for that user (valid user, empty body).
+- 404: unknown user.
+- No auth required for public stats. Send a descriptive `User-Agent`
+  (`world-map-of-music/1.0`). Read the shape defensively:
+  `body?.payload?.genre_activity ?? []`.
 
 ## Technical design
 
-The stack is fixed by EPIC 1: Node + TypeScript pipeline, Vite static SPA,
-Canvas 2D map, nginx static serving, runtime `env.js`. Reuse the existing
-patterns (rate-limited client, append-only JSONL cache, deterministic
-emit, `scripts/copy-data.mjs`, `role="img"` canvas, `localStorage` state).
-The contracts below (schemas, budgets, thresholds) are firm; equivalent
-implementations are fine where noted.
+### Architecture
 
-### New and changed files
+The shipped container today is nginx serving static files. Add a second
+container, `api`, built from the same Dockerfile via a new target. nginx
+proxies `/api/` to it by service name. The api container is never
+published on the host; nginx is the only path to it. No database, no
+migrations: the passport schema stays at v3 and LB stamps are ordinary
+stamps (date = the local day of the fill, no track fields, because the
+map did not play those tracks and must not claim it did).
 
+### New files
+
+- `server/lb.mjs`: pure, dependency-free logic, exported for tests.
+  - `validateUsername(raw)`: decode with `decodeURIComponent` (a
+    `URIError` means invalid), trim, require 1..64 chars, reject any of
+    control chars (U+0000..U+001F, U+007F), `/`, `\`. Returns
+    `{ok: true, name}` or `{ok: false}`.
+  - `matchGenres(genreActivity, atlasNameIndex)`: aggregate
+    `listen_count` per lowercased `genre` string, join against the atlas
+    by lowercased name, drop non-matches, sort by listenCount desc then
+    name asc, cap at 500 entries. Returns
+    `[{mbid, name, listenCount}]` using the atlas's canonical casing.
+  - `TtlCache(maxEntries)`: `get(key, now)` / `set(key, value, ttlMs,
+    now)`, evicts the oldest entry past `maxEntries` (500).
+  - `RateLimiter(limit, windowMs)`: sliding window per key,
+    `allow(key, now)`. 10 requests per minute per client IP.
+- `server/app.mjs`: `createHandler({atlas, fetchImpl, now, log,
+  reportError})` returning a `(req, res)` function. All time and I/O are
+  injected so tests never touch the network or the clock.
+- `server/index.mjs`: bootstrap. Reads `data/genres.json` (path from
+  `ATLAS_PATH`, default `data/genres.json`), builds the name index,
+  starts `http.createServer` on `PORT` (default 8081), host `0.0.0.0`.
+- `web/src/state/listenbrainz.ts`: DOM-free client flow,
+  `fillFromListenBrainz(name, deps)` with injected fetch and passport
+  ops. Returns `{ok, added, message}`.
+- `web/src/poster/poster.ts`: pure poster layout and drawing.
+- `web/src/ui/posterModal.ts`: the poster modal (preview, download,
+  focus management).
+- `test/server.test.ts`, `test/listenbrainz.test.ts`,
+  `test/poster.test.ts`, `e2e/listenbrainz.spec.ts`, `e2e/poster.spec.ts`.
+
+### Modified files
+
+- `web/index.html`: LB section and poster button inside the passport
+  sheet, poster modal markup.
+- `web/src/ui/passportView.ts`: wire the LB form and poster button via
+  injected deps (`onFill`, `onPoster`).
+- `web/src/state/passport.ts`: add `addStamps(mbids: string[]): number`
+  (batch; resolves via the existing mbid map, skips already-stamped,
+  appends all, one `writePassport`, returns the number added).
+- `web/src/main.ts`: construct the deps, refresh renderer/dare/aria after
+  a fill, call `renderer.fit()` on a successful fill, Escape-key ordering
+  (poster modal first, then passport sheet, then now-playing, then dare).
+- `web/src/style.css`: styles for the new controls and modal (existing
+  tokens and patterns; 44px targets; visible focus).
+- `vite.config.ts`: `server.proxy` for `/api` to
+  `process.env.API_PROXY_TARGET ?? "http://127.0.0.1:8081"`.
+- `nginx.conf`, `Dockerfile`, `docker-compose.yml`,
+  `docker-compose.staging.yml`, `docker-compose.dev.yml`: wiring below.
+- `test/copy-lint.test.ts`: add every new dynamic string.
+- `README.md`: the proxy route, the privacy stance, the two-service run,
+  `server/` in the contribute map.
+
+### API contract
+
+`GET /api/listenbrainz/:username`
+
+Success (200), `Content-Type: application/json; charset=utf-8`:
+
+```json
+{ "stamps": [ { "mbid": "…", "name": "jazz", "listenCount": 412 } ],
+  "pending": false }
 ```
-pipeline/
-  lib/itunes.ts          NEW  serialized iTunes Search client, ~20 req/min
-  fetch-exemplars.ts     NEW  stage: resolve one preview per genre (resumable)
-  emit-exemplars.ts      NEW  stage: write data/exemplars.json from cache
-  index.ts               EDIT register exemplars + emit-exemplars stages
-  types.ts               EDIT ExemplarRecord, ExemplarsFile shapes
-data/
-  cache/exemplars.jsonl  NEW committed resumable cache (one line per genre)
-  exemplars.json         NEW committed OUTPUT (previews keyed by mbid)
-web/src/
-  types.ts               EDIT Exemplar, ExemplarIndex, Passport v2, Stamp
-  state/passport.ts      EDIT v2 stamps, add/remove stamp, migrate, export/import
-  state/exemplars.ts     NEW  load + index exemplars.json (Map by mbid)
-  audio/player.ts        NEW  single Audio element, warm + play
-  ui/nowPlaying.ts       NEW  now-playing panel (hear + stamp + resting state)
-  ui/passportView.ts     NEW  passport panel (list, count, export/import, zoom-out)
-  map/renderer.ts        EDIT hitTest(screenX,screenY) -> Genre | null
-  map/input.ts           EDIT tap detection -> onSelect(genre)
-  main.ts                EDIT wire exemplars, audio, now-playing, passport view
-  index.html             EDIT passport button, now-playing + passport markup
-  style.css              EDIT now-playing panel, passport sheet styles
-scripts/copy-data.mjs    EDIT copy exemplars.json into web/public/data
-data/demo-passport.json  KEEP names; seed synthesizes dates + tracks (below)
+
+- Upstream 204 maps to 200 with `{"stamps": [], "pending": true}`.
+- A valid user whose stats match nothing returns
+  `{"stamps": [], "pending": false}`.
+- `stamps` is capped at 500, sorted by `listenCount` desc.
+
+Errors are always JSON of the shape `{"error": "<one product-voice
+sentence or two>"}`, never a stack trace, never HTML from the app itself:
+
+| Case | Status | `error` body |
+| --- | --- | --- |
+| Invalid username (fails validation) | 400 | That name has a character ListenBrainz skips. Check it, or tap any genre to stamp it yourself. |
+| Upstream 404 (unknown user) | 404 | ListenBrainz can't find that name. Check the spelling, or tap any genre to stamp it yourself. |
+| Local rate limit exceeded | 429 (+ `Retry-After: 60`) | Lots of lookups right now. Wait a minute and try again. |
+| Upstream 429/5xx, network error, or 8s timeout | 502 | ListenBrainz didn't answer. Try again in a moment. |
+| Unexpected server exception | 500 | The lookup broke on our side. Try again in a moment. |
+| Unknown `/api/...` path | 404 | Check the address and try again. |
+
+`GET /healthz` returns 200 `{"ok": true}` (compose healthcheck; not
+proxied by nginx).
+
+All responses carry `X-Content-Type-Options: nosniff` and
+`Cache-Control: no-store` (the server-side cache is the proxy's own; the
+browser must not add a second, unbounded one).
+
+### Server behavior (the security and privacy criteria live here)
+
+- Routing: the handler receives the original URI including the `/api`
+  prefix (nginx forwards it unchanged). Route on
+  `/api/listenbrainz/<segment>` exactly; anything else under `/api` is
+  the JSON 404.
+- Rate limit: keyed by client IP, taken from the `X-Real-IP` header when
+  present (nginx sets it; the api port is never published so the header
+  is trustworthy), else the socket address. 10/min sliding window. The
+  429 must fire before any upstream call.
+- Cache: in-memory `TtlCache`, key = lowercased trimmed username.
+  TTLs: success 6h, upstream-404 5min, pending-204 10min. Max 500
+  entries. A cache hit performs no upstream call. Nothing is ever
+  written to disk.
+- Upstream call: `https://api.listenbrainz.org/1/stats/user/` +
+  `encodeURIComponent(name)` + `/genre-activity`, with
+  `AbortSignal.timeout(8000)` and the `User-Agent` above. Deduplicate
+  concurrent in-flight requests for the same name (one upstream call,
+  N waiters).
+- Privacy, non-negotiable: the username appears in no log line, no error
+  report, and no persistent store, on any code path. The only log format
+  is `lb <status> <ms>ms cache=<hit|miss|skip>` plus a fixed-string
+  startup line. `console.log(req.url)` or logging the error of a failed
+  upstream call verbatim (it can contain the URL) are defects; scrub by
+  never interpolating the URL or name into anything logged.
+- Error tracking: `reportError(dsn, err)` in `server/lb.mjs`. When
+  `SENTRY_DSN` is set, POST a minimal Sentry store payload (hand-rolled,
+  no SDK: parse the DSN, POST
+  `{scheme}://{host}/api/{projectId}/store/` with the `X-Sentry-Auth`
+  key header, body `{message: err.name + ": " + err.message}` after
+  replacing any occurrence of the current username with `[name]`).
+  Fire-and-forget, wrapped in catch, called only for unexpected
+  exceptions (the 500 path). When the env is absent it is a no-op.
+
+### Client fill flow
+
+Passport sheet gains a section under the stamp list, above the existing
+actions row:
+
+```html
+<section class="ps-fill" aria-labelledby="lb-heading">
+  <h3 id="lb-heading">Fill from ListenBrainz</h3>
+  <p class="ps-hint">Stamps the genres your public stats show. Looked up once, never stored.</p>
+  <form id="lb-form">
+    <label for="lb-name">ListenBrainz name</label>
+    <input id="lb-name" type="text" autocomplete="off" spellcheck="false" maxlength="64" placeholder="e.g. rob" />
+    <button id="lb-fill" class="primary" type="submit">Light my map</button>
+  </form>
+  <p id="lb-status" class="ps-msg" role="status" aria-live="polite" hidden></p>
+</section>
 ```
 
-### Exemplar pipeline
+Flow in `fillFromListenBrainz(name, deps)`:
 
-**Source: iTunes Search API (no key).**
-`https://itunes.apple.com/search?term=<genre>&entity=song&limit=25`.
-Returns `{ resultCount, results: [{ trackName, artistName, previewUrl,
-artworkUrl100, ... }] }`. For each genre, pick the **first result that has
-a non-empty `previewUrl`** as the exemplar; record `trackName`,
-`artistName`, `previewUrl`, and `artworkUrl100`. If no result has a
-preview, record a negative (see cache) so the genre is not refetched.
+1. Trim. Empty: return the local message "Type a ListenBrainz name
+   first, or tap any genre to stamp it yourself." without any fetch.
+2. Show busy state within 100ms: disable the button, set `#lb-status`
+   to "Looking up your genres."
+3. `fetch("/api/listenbrainz/" + encodeURIComponent(name))`. Any network
+   failure or non-JSON body (nginx 502 while the api restarts, for
+   example) maps to "ListenBrainz didn't answer. Try again in a moment."
+4. Error JSON: show `body.error` verbatim in `#lb-status`.
+5. 200 with `pending: true`: "ListenBrainz is still adding up your
+   stats. Try again later, or tap any genre to stamp it yourself."
+6. 200 with stamps but zero matches after `addStamps` because all were
+   already lit: "Your map already shows those genres."
+7. 200 with an empty `stamps` array: "Your stats use tags this map
+   skips. Tap any genre to stamp it yourself."
+8. 200 with `added > 0`: apply via `addStamps(mbids)` (ONE storage
+   write, then one `applyPassportChange`-style refresh in main.ts:
+   renderer lit set, aria-label, passport view, `ensureDare`). Then
+   `renderer.fit()` so the zoom-out frames the newly lit territory, and
+   show "Lit 24 new genres from your travels." (singular: "Lit 1 new
+   genre from your travels.").
 
-**`pipeline/lib/itunes.ts` (new client, mirrors `lib/mb.ts`):**
-- Serialized, single in-flight request, throttled to a **minimum 3000ms
-  interval** (≤ ~20 req/min). No API key, no personal contact required.
-- Set a descriptive `User-Agent` (reuse the app UA string; it needs no
-  secret). Encode the query with `encodeURIComponent`.
-- On `429`/`5xx`, honor `Retry-After` if present, else exponential
-  backoff, with a bounded retry count. A genre that still fails after
-  retries is left uncached (retried on the next pass), exactly like
-  `fetch-cooccurrence`. Never abort the whole run for one genre.
-- Export a `requestsMade()` counter for tests.
+Rules:
 
-**Stage `fetch-exemplars` (`pipeline/fetch-exemplars.ts`):**
-- Load the genre list from `data/cache/genres.json` (authoritative set).
-- Read `data/cache/exemplars.jsonl`; build the set of already-completed
-  mbids (positive *and* negative records both count as done).
-- Front-load the same PRIORITY core set used by `fetch-cooccurrence` (the
-  ground-truth genres and demo-passport genres) so a partial run yields a
-  demo-ready, testable file. The rest follow in stable mbid order.
-- For each pending genre: query iTunes, append **one** JSONL line
-  (positive with track fields, or negative `{ mbid, name, found: false }`).
-  One appended line per completed genre so an interrupted run resumes
-  without repeating work.
-- Log progress every N genres and a final `fetched / negative / to-retry`
-  summary.
+- The username is never persisted client-side (no localStorage, no URL
+  param). The input keeps its in-session value only.
+- Auto-filled stamps never call `completeDare` and never bump the
+  streak. If the fill happens to stamp today's dare genre, the existing
+  `ensureDare` logic marks the dare done without a streak bump. The
+  streak stays a record of dares actually taken.
+- Framing: all copy in this feature says stamps, stats, travels, and
+  explored. The strings "listening history" and "your history" must not
+  appear anywhere in the UI.
 
-**Stage `emit-exemplars` (`pipeline/emit-exemplars.ts`):**
-- Read `data/cache/exemplars.jsonl` and the committed atlas
-  `data/genres.json` (for the authoritative mbid set and total count).
-- Emit `data/exemplars.json` with only the **positive** exemplars, keyed
-  by **mbid** (stable across atlas rebuilds; the client joins on
-  `genre.mbid`). Drop any cached mbid absent from the current atlas.
-- Deterministic: sort keys by mbid; use a fixed `generated` timestamp read
-  from `data/cache/genres.json`'s `fetchedAt` (same source EPIC 1 uses),
-  so two runs from the same cache produce a byte-identical file with **no
-  network calls**.
+### Poster
 
-**`data/exemplars.json` schema (forward-only):**
-```jsonc
-{
-  "version": 1,
-  "generated": "2026-09-10T00:00:00Z",   // = genres cache fetchedAt (deterministic)
-  "source": "iTunes Search API",
-  "coverage": { "total": 2197, "withPreview": 1487 },  // honest, flagged
-  "exemplars": {
-    "b74b3b6c-...": {                     // key = genre mbid
-      "trackTitle": "…",
-      "artist": "…",
-      "previewUrl": "https://audio-ssl.itunes.apple.com/…m4a",
-      "artworkUrl": "https://…/100x100bb.jpg"            // optional; omit if absent
-    }
-  }
+Trigger: a "Make a poster" button in the passport sheet's actions row.
+Modal markup (sibling of the passport sheet, above it in z-order):
+
+```html
+<div id="poster" class="poster-modal" role="dialog" aria-modal="true" aria-labelledby="poster-heading" hidden>
+  <div class="poster-inner">
+    <header>
+      <h2 id="poster-heading">Your poster</h2>
+      <button id="poster-close" class="sheet-close" type="button" aria-label="Close">&times;</button>
+    </header>
+    <p id="poster-wait" role="status">Printing your map.</p>
+    <img id="poster-img" alt="Poster of your lit map" hidden />
+    <div class="poster-actions">
+      <button id="poster-download" class="primary" type="button" hidden>Download PNG</button>
+    </div>
+  </div>
+</div>
+```
+
+`web/src/poster/poster.ts`:
+
+- Constants: width 1080, height 1350 (4:5 portrait), background
+  `BACKGROUND` from `web/src/map/colors.ts`.
+- `fitTransform(bounds, rect)`: pure. Fits the atlas bounds into a
+  target rect preserving aspect, centered. Handles degenerate bounds
+  (width or height 0) without dividing by zero. Returns
+  `{scale, dx, dy}`.
+- `posterCountLine(lit, total)`: pure. `"412 of 2,197 genres lit"`,
+  numbers via `toLocaleString("en-US")`.
+- `posterDateLine(date)`: pure. `"September 15, 2026"` via
+  `toLocaleDateString("en-US", {year: "numeric", month: "long",
+  day: "numeric"})`.
+- `drawPoster(canvas, atlas, lit, opts: {dateLabel, host})`: sets the
+  canvas to 1080x1350, fills the background, fits the map into the rect
+  x 60..1020, y 170..1120 using `fitTransform`. Draws unlit dots first
+  (radius 2, `UNLIT_COLOR`), then lit dots (radius 5, `regionColor`,
+  `shadowBlur` 14 in the dot's own color), mirroring the live
+  renderer's draw order so glow reads over the dark field. Text, all
+  `system-ui` so nothing loads over the network: title "A world map of
+  music" (600 34px, centered, y 96, `rgba(233,238,246,0.92)`), the
+  count line (600 44px, centered, y 1210), and one footer line (400
+  24px, centered, y 1268, `rgba(148,163,184,0.9)`) with the date label
+  and, when non-empty, the host separated by a middot, for example
+  "September 15, 2026 · music.example.org".
+- `makePosterBlob(atlas, lit, opts)`: draws on a fresh offscreen canvas
+  and resolves `canvas.toBlob` as a PNG `Blob`. Rejects only if the
+  browser returns null.
+
+`web/src/ui/posterModal.ts` behavior:
+
+- Open: show the modal immediately with the "Printing your map." status
+  (feedback within 100ms), move focus to Close, then on the next frame
+  generate the blob, set `#poster-img.src` to an object URL, reveal the
+  image and Download, hide the status.
+- Download: an anchor click with `download="music-map-poster.png"` on
+  the same object URL.
+- Close (button or Escape): hide, revoke the object URL, restore focus
+  to the element that opened it. Escape closes the poster before the
+  passport sheet (ordering in main.ts's keydown handler).
+- The host passed in is `window.location.host`; pass an empty string
+  when it starts with `localhost` or `127.0.0.1` so local posters skip
+  the footer host.
+- No fetches of any kind on this path. The canvas draws no external
+  images (no artwork), so `toBlob` can never hit a tainted-canvas error.
+
+### Infra wiring
+
+Dockerfile: add a target before the nginx stage.
+
+```dockerfile
+FROM node:22-alpine AS api
+WORKDIR /app
+ENV NODE_ENV=production PORT=8081
+COPY server/ server/
+COPY data/genres.json data/genres.json
+USER node
+EXPOSE 8081
+CMD ["node", "server/index.mjs"]
+```
+
+nginx.conf: add above the `location /` block.
+
+```nginx
+location /api/ {
+  resolver 127.0.0.11 valid=30s ipv6=off;
+  set $api_upstream api;
+  proxy_pass http://$api_upstream:8081;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_read_timeout 15s;
 }
 ```
-- **Size budget:** `data/exemplars.json` gzipped MUST be under **300KB** so
-  it never delays first render. If real coverage pushes it over, drop
-  `artworkUrl` first (artwork is a nice-to-have, the preview is the point).
-- Forward-only: EPIC 3/4 may add fields; do not remove or rename these.
 
-**Resumability contract (must hold, mirrors EPIC 1):** deleting
-`data/exemplars.json` and re-running `emit-exemplars` with the cache
-present regenerates a byte-identical file with **zero** network calls;
-deleting one genre's line from `exemplars.jsonl` and re-running the fetch
-stage refetches **only** that genre. `data/cache/exemplars.jsonl` is
-committed so a fresh clone resumes rather than restarts.
+(The variable form makes nginx resolve at request time, so the web
+container starts and serves the map even if the api container is down;
+the client copy covers the resulting 502.)
 
-**Package scripts (add, keep the atlas pipeline separate so an atlas
-rebuild never triggers iTunes fetches):**
-- `exemplars:fetch` → `tsx pipeline/index.ts exemplars`
-- `exemplars:emit` → `tsx pipeline/index.ts emit-exemplars`
+Compose:
 
-### Passport v2 (client state, browser-only)
+- `docker-compose.yml`: add service `api` (build target `api`, no host
+  port, `SENTRY_DSN` passed through, `mem_limit: 128m`,
+  `restart: unless-stopped`, healthcheck
+  `wget -qO- http://127.0.0.1:8081/healthz`). `web` gets
+  `depends_on: [api]`.
+- `docker-compose.staging.yml`: same `api` service with
+  `container_name: a-world-map-of-music-that-remembers-where-yo-staging-api`,
+  on the default network only (NOT the external staging network; nginx
+  fronts it), `oom_score_adj: 800`. `web` gets `depends_on: [api]`.
+- `docker-compose.dev.yml`: add `api` service (image `node:22-alpine`,
+  same volume mounts, `command: node server/index.mjs`, no host port)
+  and set `API_PROXY_TARGET: http://api:8081` in the `web` service env
+  so the vite proxy reaches it.
 
-Extend `web/src/state/passport.ts`. The renderer only needs a lit set, so
-`litSet(passport)` keeps returning `Set<genreId>`; the renderer is
-unchanged apart from `hitTest`.
+`.env.example` needs no new keys (PORT and ATLAS_PATH have safe
+defaults; there are no new secrets).
 
-```ts
-interface Stamp {
-  genreId: number;      // atlas id, for fast lit lookup this session
-  mbid: string;         // stable across atlas rebuilds (join key on import)
-  date: string;         // first-listen date, "YYYY-MM-DD" (local)
-  trackTitle?: string;  // the track that earned it (from the exemplar)
-  artist?: string;
-}
-interface Passport {
-  version: 2;
-  stamps: Stamp[];      // at most one per genre; genreId unique
-}
-```
+### Copy inventory (final strings, sweep-clean; ship these verbatim)
 
-- **`localStorage` key stays `passport`.** `readPassport()` runs a
-  `migratePassport(raw)`:
-  - v2 object with a `stamps` array → validated passthrough (drop stamps
-    whose genreId/mbid is not resolvable in the loaded atlas; coerce/repair
-    types; keep at most one stamp per genre).
-  - **legacy v1** `{ lit: number[] }` (what EPIC 1 and the old demo seed
-    wrote) → convert each id to `{ genreId, mbid, date: today }` with no
-    track fields (unknown at migration time). No data is lost; the map
-    stays lit.
-  - anything else / corrupt → treat as empty passport.
-- **`addStamp(genreId, exemplar?)`**: no-op if already stamped; else append
-  a stamp with `date = today` (local `YYYY-MM-DD`) and, when an exemplar
-  exists, `trackTitle`/`artist` from it. Persist synchronously.
-- **`removeStamp(genreId)`**: drop the stamp, persist.
-- **`exportPassport()`**: serialize the current passport to a JSON string
-  for download (see UI). No network.
-- **`importPassport(text)`**: parse and **validate at the boundary**
-  before replacing state:
-  - reject non-JSON / wrong shape with a product-voice error (no stack
-    trace);
-  - cap `stamps` length at the atlas genre count; drop stamps whose `mbid`
-    is not in the atlas; re-resolve `genreId` from `mbid` against the
-    loaded atlas (so an import survives an atlas rebuild); truncate
-    `trackTitle`/`artist` to a sane length; keep dates only if they match
-    `YYYY-MM-DD`, else drop the date field.
-  - Strings are rendered with `textContent` only (never `innerHTML`), so a
-    malicious import cannot inject markup.
+Already listed in the API table and flows above, plus:
 
-### Demo seed (staging must show a rich passport)
+- Section heading: "Fill from ListenBrainz"
+- Hint: "Stamps the genres your public stats show. Looked up once, never stored."
+- Input label: "ListenBrainz name"; placeholder: "e.g. rob"
+- Button: "Light my map"
+- Busy: "Looking up your genres."
+- Poster button: "Make a poster"; modal heading "Your poster"; status
+  "Printing your map."; action "Download PNG"; image alt "Poster of
+  your lit map".
 
-`data/demo-passport.json` stays a list of genre **names** (survives atlas
-regeneration). The seeding path in `resolveInitialPassport` (already gated
-by `SEED_DEMO` + "no existing passport") now produces **full v2 stamps**:
-for each resolved name, create a stamp whose `date` steps back a few days
-from today (deterministic per index, so the passport view shows a
-plausible exploration history) and whose `trackTitle`/`artist` come from
-the loaded exemplar when present. This makes the staging passport view
-demonstrate its real value (dated stamps with tracks), not a bare list.
+Every one of these, and every string in the API error table, goes into
+the dynamic-strings list in `test/copy-lint.test.ts`.
 
-### Hearing a genre (audio + selection)
+## Ordered task list
 
-**Loading exemplars (`web/src/state/exemplars.ts`):** fetch
-`/data/exemplars.json` and build a `Map<mbid, Exemplar>`. Load it **in
-parallel with, and never blocking, the map render** (the map paints from
-`genres.json` first; audio becomes available when exemplars resolve).
-`getExemplar(genre)` returns the entry or `undefined`.
+### T1: The proxy service
 
-**Audio (`web/src/audio/player.ts`):** ONE reusable `HTMLAudioElement`,
-`preload="auto"`.
-- `warm(url)`: if `url` differs from the current src, set src (begins
-  buffering). Called on desktop hover and on the pointerdown that may
-  become a tap, so the clip is warm before the tap resolves.
-- `play(url)`: set src if needed, then `play()`. MUST be called
-  synchronously inside the tap gesture so mobile autoplay policy is
-  satisfied. Selecting a new genre stops the previous clip; a clip plays
-  to its natural 30s end otherwise.
-- `stop()`: pause and reset. Called when the now-playing panel closes or
-  the user taps empty map space.
-- Expose a test hook `window.__nowPlaying = { mbid, trackTitle, artist,
-  hasPreview, playing }`, updated synchronously on select (audio output is
-  unreliable in headless browsers; tests assert intent + UI, not sound).
+Build `server/lb.mjs`, `server/app.mjs`, `server/index.mjs` exactly per
+the design, plus `test/server.test.ts`.
 
-**Hit-testing (`map/renderer.ts`):** add
-`hitTest(screenX, screenY): Genre | null` — invert the viewport transform,
-find the nearest genre within a **tap radius of ~14px** (comfortable on
-touch); return null if none. Linear scan over 2,197 nodes is well under a
-frame; no spatial index needed.
+Acceptance criteria:
 
-**Tap vs pan (`map/input.ts`):** a pointer sequence is a **tap** when
-pointerup occurs within ~6px of pointerdown and under ~400ms; a larger
-move is a pan (unchanged). On tap, call `onSelect(genre | null)` supplied
-by `main.ts`. On pointerdown of a potential tap over a genre, call
-`audio.warm(previewUrl)` to pre-buffer.
+- `node server/index.mjs` starts with only the repo checked out (no
+  `npm install` needed by the server itself) and serves `/healthz`.
+- `validateUsername` accepts "rob" and names with inner spaces, rejects
+  empty, whitespace-only, longer than 64, slashes, backslashes, control
+  characters, and malformed percent-encoding.
+- `matchGenres` sums hourly rows per genre, matches case-insensitively
+  against the atlas name index, drops unmatched tags, sorts by count
+  desc, caps at 500.
+- Handler (integration-tested through a real `http` server on port 0
+  with an injected fake `fetchImpl`): 200/204/404/timeout/network-error
+  upstream cases and the local 400/429 cases all return exactly the
+  statuses and JSON bodies in the API table. The 400 and 429 paths make
+  zero upstream calls. A second request for the same name is served
+  from cache with `fetchImpl` called once. The injected `log` capture,
+  concatenated across every test case, never contains the username.
+- No new entries in `package.json` `dependencies`.
 
-**Selection flow (`main.ts` + `ui/nowPlaying.ts`):** on select of a genre:
-1. Synchronously (this tick, well under 100ms): highlight the node, open
-   the now-playing panel with the track/artist (or resting state), update
-   `window.__nowPlaying`.
-2. If it has a preview, `audio.play(url)`; else leave the panel in the
-   resting state (no player controls, no error).
-3. The panel shows a **Stamp** button (primary). Tapping it calls
-   `addStamp`, then `renderer.setLit(newLitSet)` **immediately**
-   (optimistic light), updates the canvas `aria-label` lit count, and
-   flips the button to a stamped state with a Remove affordance. Persist
-   after the optimistic render.
-- Selecting empty space (`hitTest` null) closes the panel and stops audio.
+### T2: Ship it behind nginx
 
-### The passport view (`ui/passportView.ts`)
+Dockerfile target, nginx block, three compose files, vite dev proxy,
+README, `.env.example` untouched.
 
-A panel/sheet toggled by a **Passport button** (top-right, ≥44px, shows the
-lit count as a badge). Contents:
-- **Header:** title `Passport`, count line `{N} of ~2,200 lit` (use the
-  literal `~2,200`; N is live).
-- **Stamp list:** newest first. Each row: a region-color swatch, the genre
-  name, a secondary line `"{trackTitle} · {artist}"` when known (middot
-  separator, not a dash) else the date alone, and the first-listen date.
-  Each row has a small **Remove** control. Rows are the only unbounded
-  list in the app; it is capped by the genre count (~2,200) and scrolls
-  within the sheet, so it cannot grow without bound.
-- **Empty state (designed, positive, directive, points at the map):**
-  headline `Your map is dark`, body `Tap a genre to hear it. Stamp the
-  ones you love.`, and the panel closes to reveal the map. (No blank
-  region, no negative phrasing.)
-- **Actions:** `Export` (download), `Import` (file picker), and
-  `See your map` — the last closes the panel and calls `renderer.fit()` so
-  the user lands on the zoom-out signature moment (their glow against the
-  dark). This works from the first three stamps with no special case.
-- **Export:** build a `Blob` of `exportPassport()`, create an object URL,
-  click a hidden `<a download="music-passport.json">`, revoke the URL. No
-  network.
-- **Import:** hidden `<input type="file" accept="application/json">`; on
-  change, read the file, call `importPassport(text)`; on success replace
-  state, `renderer.setLit(...)`, refresh the list and count; on failure
-  show a product-voice inline message (see copy).
+Acceptance criteria:
 
-### Designed states and copy (verbatim, already swept)
+- `docker compose up --build` brings up `web` and `api`, both healthy.
+- `curl http://127.0.0.1:8080/api/listenbrainz/a%2Fb` returns the 400
+  product-voice JSON through nginx (deterministic, no upstream call, so
+  it verifies the full proxy chain offline).
+- `curl http://127.0.0.1:8080/` still serves the app; static behavior,
+  caching headers, and the staging file's network layout are unchanged
+  except for the additions above.
+- The api container publishes no host port in any compose file and does
+  not join the external staging network.
+- README explains the one runtime route in a sentence, states the
+  privacy stance (looked up once, never logged, never stored), and the
+  Run/Contribute sections match the actual files.
 
-Use these strings exactly. If you change them, re-sweep for em-dashes/
-en-dashes, banned vocabulary, and negative empty-state phrasing.
+### T3: Fill from ListenBrainz in the passport sheet
 
-- **Now playing, has preview:** primary button `Stamp`; once stamped, the
-  control shows `Stamped {date}` with a secondary `Remove stamp`.
-- **Now playing, resting state (genre has no preview):** body
-  `Silent for now. Stamp it to remember.`; primary button `Stamp`. (No
-  player controls, no error, no "no preview" text.)
-- **Passport button label / aria-label:** `Passport`.
-- **Passport header:** `Passport`; count line `{N} of ~2,200 lit`.
-- **Passport empty state:** headline `Your map is dark`; body `Tap a genre
-  to hear it. Stamp the ones you love.`
-- **Passport actions:** `Export`, `Import`, `See your map`.
-- **Import success (inline):** `Passport restored.`
-- **Import failure (inline, product voice, actionable):** `That file did
-  not look like a passport. Pick a passport you exported here.`
-- **Row remove control aria-label:** `Remove stamp` (+ genre name for
-  screen readers).
+`web/src/state/listenbrainz.ts`, `addStamps` in passport.ts, markup in
+index.html, wiring in passportView.ts and main.ts, styles,
+`test/listenbrainz.test.ts`, `e2e/listenbrainz.spec.ts` (all `/api`
+routes mocked with `page.route`; the e2e web server is static).
 
-Sweep note: separators in the stamp list use the middot `·`, never a dash.
-The count uses `~2,200`. The failure copy avoids "something went wrong"
-and stack traces. Extend the copy-lint test's dynamic-string list with all
-strings above (the ones built in TS), since only `index.html` is scanned
-from disk.
+Acceptance criteria:
 
-### Accessibility and mobile
+- `addStamps` applies N stamps with exactly one localStorage write,
+  skips already-stamped and unknown mbids, and returns the added count.
+- Submitting a mocked valid name lights the map: lit count in the
+  canvas aria-label and the passport count line both rise by the number
+  of new stamps, the stamps persist across reload, the view returns to
+  fit, and the success message shows the count.
+- The busy status appears while a delayed mocked response is in flight
+  (feedback within 100ms of the click).
+- Empty and whitespace names show the local message and trigger no
+  `/api` request; mocked 404 and 502 show their exact product-voice
+  strings and change nothing.
+- Auto-filled stamps carry today's date and no track fields, and the
+  streak count is unchanged after a fill that includes the dare genre.
+- The username is absent from localStorage after a successful fill and
+  a reload.
+- New controls are keyboard reachable, labeled, at least 44px tall, and
+  work at a 390px viewport with no horizontal scroll.
 
-- The now-playing panel and passport sheet are real DOM with headings,
-  labeled buttons, and visible focus (reuse the EPIC 1 `:focus-visible`
-  rules). Every button ≥44px. Opening the passport moves focus into it;
-  closing returns focus to the Passport button. `Escape` closes either
-  overlay.
-- The canvas `aria-label` continues to report genre and lit counts; update
-  it on every stamp/un-stamp so assistive tech hears the frontier move.
-- The map is a canvas, so genre selection is pointer-driven; provide a
-  keyboard path to the passport and its controls (they are DOM). Selecting
-  individual genres by keyboard on the canvas is **not** required in this
-  EPIC (canvas node-level keyboard nav is a known limitation carried
-  forward; note it, do not build a hidden DOM node per genre now).
-- Mobile-first at 390px: passport is a bottom/full sheet, now-playing
-  panel sits above the zoom controls and clears the safe-area insets, no
-  horizontal scroll, artwork and text readable without zoom.
+### T4: The poster
 
-### Performance
+`web/src/poster/poster.ts`, `web/src/ui/posterModal.ts`, markup,
+wiring, styles, `test/poster.test.ts`, `e2e/poster.spec.ts`.
 
-- First meaningful render is unchanged and must stay <1s: the map paints
-  from `genres.json`; `exemplars.json` loads in parallel and only gates
-  audio, never the map.
-- Stamp feedback is optimistic and synchronous (<100ms): light the node,
-  then persist.
-- No unindexed hot-path work: hit-test is a bounded linear scan; the stamp
-  list is capped by the genre count and scrolls.
+Acceptance criteria:
 
-### Deploy, README, env
+- `fitTransform` centers and preserves aspect for wide, tall, and
+  degenerate bounds; `posterCountLine(412, 2197)` is exactly
+  "412 of 2,197 genres lit".
+- On a seeded map, "Make a poster" opens the modal within 100ms, shows
+  the preview image (naturalWidth 1080, naturalHeight 1350), and the
+  Download button saves `music-map-poster.png` whose file size is over
+  20 kB.
+- Zero non-origin requests occur between opening the modal and the
+  completed download (asserted with a request listener in the e2e).
+- Escape closes the modal before the passport sheet, focus returns to
+  the opener, and the object URL is revoked on close.
+- Works at a 390px viewport: modal fits, no horizontal scroll, buttons
+  at least 44px.
 
-- `scripts/copy-data.mjs`: add `exemplars.json` to the copied files, with a
-  safe placeholder (`{ "version":1, "generated":"1970-01-01T00:00:00Z",
-  "source":"iTunes Search API", "coverage":{"total":0,"withPreview":0},
-  "exemplars":{} }`) when the file is absent, so dev/build work before the
-  exemplar pipeline has run.
-- No new runtime env is required (no key, no backend). Do not add secrets.
-  `.env.example` gains a short comment that the exemplar stage needs no
-  key. `SEED_DEMO` behavior is unchanged (now seeds richer stamps).
-- **README:** add the exemplar pipeline to the "regenerate the data"
-  section with the exact new script names (`npm run exemplars:fetch`,
-  `npm run exemplars:emit`), noting it is incremental, resumable, honors
-  the polite iTunes rate, and that partial coverage is expected and shown
-  honestly. Update the one-line product description if needed to mention
-  hearing and stamping. Verify every command against the actual files. No
-  factory internals.
+### T5: Copy sweep and final gates
 
----
+Acceptance criteria:
 
-## Ordered task list (each with acceptance criteria)
+- Every new user-visible string (index.html additions plus the dynamic
+  strings from server errors, fill messages, and poster) is appended to
+  `test/copy-lint.test.ts` and the sweep passes: no em or en dashes, no
+  banned vocabulary, no negative empty-state phrasing.
+- The strings "listening history", "Spotify", and "OAuth" appear in no
+  user-visible string (grep across `web/` and `server/`).
+- `npm test`, `npm run typecheck`, and `./scripts/e2e.sh` all pass.
 
-### Task 1 — Exemplar fetch stage (resumable, rate-limited)
-Add `lib/itunes.ts`, `fetch-exemplars.ts`, wire the `exemplars` stage into
-`index.ts` and `package.json`. Add `ExemplarRecord` to `pipeline/types.ts`.
-- **AC:** running the stage appends to `data/cache/exemplars.jsonl` (one
-  line per completed genre, positive or negative); re-running makes
-  **zero** network calls for already-cached genres; deleting one line
-  refetches only that genre; requests are throttled to ≤ ~20/min;
-  transient failures are retried and, if still failing, left for the next
-  pass without aborting the run.
+## Test plan (planner criterion to proof)
 
-### Task 2 — Emit `data/exemplars.json` (deterministic, flagged, budgeted)
-Add `emit-exemplars.ts` and wire it into `index.ts`/`package.json`.
-- **AC:** given a fixed cache and committed atlas, emit writes
-  `data/exemplars.json` keyed by mbid with only positive exemplars, a
-  `coverage` object, and a deterministic `generated`; two runs from the
-  same cache are **byte-identical** with no network; every key resolves to
-  a genre in `data/genres.json`; the file is **under 300KB gzipped**.
+| Planner criterion | Proof |
+| --- | --- |
+| Proxy validates, rate-limits, caches, never logs the name, product-voice errors | `test/server.test.ts`: validation matrix; 429 after 10 requests in a window with no upstream call; single-fetch cache assertion; log-capture-never-contains-name assertion across all cases; exact error-body assertions for 400/404/429/502/500. T2 curl check proves the chain through nginx. |
+| Valid name lights the map in seconds; unknown or empty name shows a positive, actionable message and offers manual stamping | `e2e/listenbrainz.spec.ts` (mocked routes): success path asserts lit count, persistence, fit, message; 404/empty paths assert exact strings containing the manual-stamp offer and an unchanged map. `test/listenbrainz.test.ts` covers every status-to-message mapping without a DOM. |
+| Make a poster renders a downloadable client-side PNG, no account, no upload | `e2e/poster.spec.ts`: download event with the right filename and size, preview dimensions, zero non-origin requests during the flow. `test/poster.test.ts` proves the pure layout math and text. |
+| Framing stays exploration-record; copy sweep clean | `test/copy-lint.test.ts` extended with every new string; T5 grep for "listening history"; stamp shape (today's date, no track fields) asserted in `test/listenbrainz.test.ts`. |
 
-### Task 3 — Real exemplar data committed
-Run the exemplar pipeline against real iTunes data (to completion or to a
-committed resumable checkpoint with broad coverage of the priority set and
-the demo genres), commit `data/exemplars.json` and
-`data/cache/exemplars.jsonl`.
-- **AC:** `data/exemplars.json` is committed with real previews; every
-  `data/demo-passport.json` genre that has an iTunes preview resolves to
-  one (so staging can hear and show tracks); coverage is reported honestly
-  in the file; the gzip budget holds.
+Notes for the implementer:
 
-### Task 4 — Passport v2, migration, stamp/un-stamp, export/import
-Extend `state/passport.ts`: v2 stamps, `migratePassport`, `addStamp`,
-`removeStamp`, `exportPassport`, `importPassport` with boundary
-validation. Update the demo seed to synthesize dated stamps with tracks.
-- **AC:** a legacy `{lit:[...]}` passport migrates to v2 with the same
-  genres lit and no data loss; adding a stamp records genreId, mbid, local
-  date, and track fields when an exemplar exists; removing works; export
-  then import round-trips to an equivalent passport; import rejects
-  non-JSON/garbage without throwing to the UI, drops stamps whose mbid is
-  absent from the atlas, re-resolves genreId from mbid, and caps length;
-  imported strings are never rendered as HTML.
-
-### Task 5 — Load exemplars, audio, hit-test, tap-to-select
-Add `state/exemplars.ts`, `audio/player.ts`; add `renderer.hitTest`; add
-tap detection + `onSelect` to `input.ts`; wire selection in `main.ts`.
-- **AC:** exemplars load in parallel and never delay first render; tapping
-  a genre selects it and (with a preview) starts audio within the tap
-  gesture with visible feedback under 100ms; a drag still pans and does not
-  select; tapping empty space deselects and stops audio; `window.__nowPlaying`
-  reflects the current selection synchronously.
-
-### Task 6 — Now-playing panel and optimistic stamp
-Add `ui/nowPlaying.ts` and its markup/styles. Wire Stamp / Remove.
-- **AC:** selecting a genre with a preview shows the track and artist and a
-  Stamp button; selecting a genre without a preview shows the resting-state
-  copy and a Stamp button, never a broken player; tapping Stamp lights the
-  genre in its region color immediately and persists across reload; the
-  canvas `aria-label` lit count updates; Remove un-lights and persists.
-
-### Task 7 — Passport view, count, export/import UI, zoom-out
-Add `ui/passportView.ts`, the Passport button, markup and styles; wire
-export download and import file picker; `See your map` calls `fit()`.
-- **AC:** the passport lists every stamp with its first-listen date and the
-  track that earned it, shows `N of ~2,200 lit`, and updates live on
-  stamp/un-stamp/import; the empty state shows the designed copy and points
-  at the map; Export downloads `music-passport.json` with no network;
-  Import restores the passport and re-lights the map; `See your map` frames
-  the zoom-out and works from the first three stamps; usable at 390px with
-  no horizontal scroll and ≥44px targets; focus is managed and `Escape`
-  closes.
-
-### Task 8 — States, accessibility, copy sweep, README, tests
-Final pass: designed states, focus management, extend the copy-lint
-dynamic-string list, update `scripts/copy-data.mjs`, `.env.example`,
-`README.md`, and wire all tests below into `npm test`.
-- **AC:** `npm test` runs green; the copy sweep over every user-visible
-  string (including the new TS strings) finds zero em-dashes/en-dashes,
-  zero banned vocabulary, and zero negative empty-state phrasing; the
-  README commands are verified against the actual files; `.env.example`
-  holds placeholders only and mentions no key is needed for exemplars.
-
----
-
-## Test plan (which automated test proves each planner criterion)
-
-- **T1 — Exemplar pipeline resolves, incremental, resumable, rate-flagged.**
-  Integration test with a mocked iTunes fetch over a small fixture genre
-  cache: (a) the fetch stage appends one line per genre and makes zero
-  calls for already-cached genres; (b) removing one cache line causes only
-  that genre to be refetched; (c) the throttle enforces the ≥3000ms
-  interval (assert the client's spacing/`requestsMade` under fake timers or
-  a spy); (d) a genre with no preview records a negative and is not
-  refetched. **Proves:** *resolves one preview per genre where one exists,
-  incremental and resumable, honors ~20 req/min, partial coverage valid and
-  flagged.*
-
-- **T2 — `exemplars.json` schema, coverage, join, budget.** Load the
-  committed `data/exemplars.json` and `data/genres.json`: every exemplar
-  key is an mbid present in the atlas; each entry has non-empty
-  `previewUrl`, `trackTitle`, `artist`; `coverage.total` equals the atlas
-  genre count and `withPreview` equals the entry count; two emit runs from
-  the same cache are byte-identical; gzipped size < 300KB. **Proves:**
-  *commits `data/exemplars.json`, one preview per genre where one exists,
-  coverage flagged.*
-
-- **T3 — Hear a genre within 100ms perceived; honest resting state.** E2E:
-  tap a known-preview genre; assert the now-playing panel shows the track
-  and `window.__nowPlaying.playing` is true within a tight budget (audio
-  intent + UI, not sound output); tap a genre known to lack a preview and
-  assert the resting-state copy shows and no player/error element appears.
-  Unit: `audio.play` sets src and calls play; selecting a new genre stops
-  the previous. **Proves:** *touching a genre starts audio within 100ms as
-  perceived; a genre with no preview shows an honest resting state.*
-
-- **T4 — Optimistic stamp lights immediately and persists.** E2E: select a
-  genre, click Stamp, assert the canvas `aria-label` lit count increments
-  synchronously; reload and assert the genre is still lit (localStorage).
-  Unit: `addStamp` is idempotent, records date + track; `litSet` includes
-  it; `removeStamp` reverses it. **Proves:** *tapping stamp lights the
-  genre in color immediately (optimistic) and persists across reload.*
-
-- **T5 — Passport view: list, count, zoom-out from three stamps.** E2E:
-  seed three stamps, open the passport, assert three rows each with a date
-  and the earning track, the `N of ~2,200 lit` count, and that
-  `See your map` closes the panel and fits the view (renderer viewport
-  changes to the fit scale). Empty-passport E2E: the empty-state copy shows
-  and points at the map. **Proves:** *passport lists stamps with
-  first-listen date and the track that earned each, shows N of ~2,200 lit,
-  zoom-out works from the first three stamps.*
-
-- **T6 — Export/import round-trip, browser-only, validated.** Unit:
-  `exportPassport`→`importPassport` yields an equivalent passport;
-  `importPassport` rejects non-JSON and wrong shapes without throwing to
-  the UI, drops stamps whose mbid is not in the atlas, re-resolves genreId
-  from mbid, and caps length. E2E: Export triggers a `music-passport.json`
-  download (assert the download event / `a[download]`); no network request
-  leaves the origin during export/import (assert via route interception).
-  **Proves:** *one click exports JSON, import restores it, data never
-  leaves the browser except the downloaded file.*
-
-- **T7 — Empty state, mobile, accessibility, copy sweep.** E2E at 390px:
-  no horizontal scroll with the passport open; Passport button and actions
-  ≥44px; focus enters the passport on open and `Escape` closes it. Copy
-  lint (extended `visibleCopy()` including the new TS strings): zero
-  em-dashes/en-dashes, zero banned vocabulary, zero negative empty-state
-  phrasing. **Proves:** *empty passport state uses positive, directive copy
-  and points at the first action; mobile-first, accessible, copy sweep
-  clean.*
-
-- **T8 — Migration and demo seed.** Unit: a stored legacy `{lit:[...]}`
-  migrates to v2 with the same genres lit; with `SEED_DEMO="1"` and no
-  stored passport, the seed produces v2 stamps with dates and (where the
-  exemplar exists) tracks, and every demo name that resolves is stamped.
-  **Proves:** the demo/staging passport view demonstrates real value, and
-  no existing passport is lost.
-
----
-
-## Assumptions and decisions (stated for the reviewer)
-
-- **The planner's scope block was present and authoritative;** this spec
-  expands it directly and does not re-derive scope from the title.
-- **iTunes exemplars are keyed by mbid, not atlas id,** so the previews
-  survive an atlas rebuild that renumbers genre ids; the client joins on
-  `genre.mbid`. The atlas pipeline and the exemplar pipeline stay
-  independent (separate scripts) so rebuilding one never forces the other.
-- **Selection plays; an explicit Stamp button stamps.** Tapping a node is
-  low-commitment (hear it); stamping is a deliberate second action, so a
-  tap never accidentally writes to the passport. This satisfies "touch to
-  hear, tap to stamp" without accidental stamps on a dense field of dots.
-- **Un-stamp is included** as the inverse of the core action, because a
-  mis-tap on ~2,200 small nodes is likely and an unrecoverable stamp would
-  make the artifact feel fragile. Bulk editing stays out of scope.
-- **The 100ms budget is met by preloading + synchronous feedback,** not by
-  assuming instant network audio: the preview URL is in memory, playback
-  starts inside the gesture, and the node highlight plus now-playing panel
-  appear the same tick. Actual buffering may take longer; the felt latency
-  does not.
-- **Partial preview coverage is expected and shown honestly** (per-genre
-  resting state in the UI, `coverage` in the data file). The long tail of
-  obscure genres will lack previews; the popular core (including the demo
-  genres) will not, which is what makes staging sing.
-- **No new backend, no new env, no key.** iTunes Search needs none; the
-  passport is browser-only. The app stays static, consistent with the
-  EPIC's non-goals.
-- **Canvas per-node keyboard selection is deferred,** not built: it is a
-  known limitation carried from EPIC 1. All DOM controls (passport, now
-  playing, export/import) are fully keyboard reachable with visible focus.
-</content>
-</invoke>
+- The e2e suite runs against `vite preview` (static only). Every
+  ListenBrainz e2e test must mock `/api/**` with `page.route`; none may
+  depend on the real proxy or the network. The real proxy is proven by
+  the vitest integration tests and the T2 curl check.
+- The existing export/import e2e asserts zero non-origin requests; the
+  mocked `/api` routes are same-origin, so nothing there changes.
+- `test/scaffold.test.ts` guards `.env.example`; it needs no changes
+  since no keys are added. Do not add secret-looking values anywhere.

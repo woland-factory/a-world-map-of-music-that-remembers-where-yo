@@ -16,7 +16,10 @@ import {
   completeDare,
   getDare,
   todayString,
+  addStamps,
 } from "./state/passport";
+import { fillFromListenBrainz } from "./state/listenbrainz";
+import { PosterModal } from "./ui/posterModal";
 import { loadExemplars, getExemplar } from "./state/exemplars";
 import { darePreviewUrl } from "./state/dare";
 import { Player } from "./audio/player";
@@ -134,6 +137,11 @@ async function start(): Promise<void> {
     }
   };
 
+  const posterModal = new PosterModal(document, {
+    atlas,
+    getLit: () => litSet(getPassport()),
+  });
+
   passportView = new PassportView(document, {
     atlas,
     getPassport,
@@ -158,6 +166,18 @@ async function start(): Promise<void> {
       return result.ok;
     },
     onSeeMap: () => renderer.fit(),
+    onFill: async (name) => {
+      const result = await fillFromListenBrainz(name, { fetchImpl: (u) => fetch(u), addStamps });
+      if (result.added > 0) {
+        // One batch already landed in storage; one repaint here, then the
+        // zoom-out frames the newly lit territory.
+        applyPassportChange();
+        renderer.fit();
+        if (selected) nowPlaying.setStamped(isStamped(selected.id), stampFor(selected.id)?.date);
+      }
+      return result;
+    },
+    onPoster: () => posterModal.open(),
   });
 
   const select = (genre: Genre | null): void => {
@@ -195,7 +215,8 @@ async function start(): Promise<void> {
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    if (passportView.isOpen) passportView.close();
+    if (posterModal.isOpen) posterModal.close();
+    else if (passportView.isOpen) passportView.close();
     else if (nowPlaying.visible) deselect();
     else if (dareCard?.isExpanded) dareCard.collapse();
   });

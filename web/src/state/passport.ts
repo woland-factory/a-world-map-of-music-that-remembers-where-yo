@@ -235,6 +235,27 @@ export function addStamp(genreId: number, exemplar?: Exemplar): Passport {
   return current;
 }
 
+// Batch stamping for the ListenBrainz fill: resolves each mbid against the
+// atlas, skips unknown and already-stamped genres, appends the rest dated
+// today with no track fields (the map did not play those tracks and must
+// not claim it did), and persists with exactly ONE storage write. Returns
+// the number of stamps added. Never touches the streak or the dare.
+export function addStamps(mbids: string[]): number {
+  const t = today();
+  const stamped = new Set(current.stamps.map((s) => s.genreId));
+  const added: Stamp[] = [];
+  for (const mbid of mbids) {
+    const g = byMbid.get(mbid);
+    if (!g || stamped.has(g.id)) continue;
+    stamped.add(g.id);
+    added.push({ genreId: g.id, mbid: g.mbid, date: t });
+  }
+  if (added.length === 0) return 0;
+  current = { ...current, version: 3, stamps: [...current.stamps, ...added] };
+  writePassport(current);
+  return added.length;
+}
+
 // Un-stamping un-lights a dot but never rolls back the streak or the frontier
 // history: those record that you did explore that day, honestly.
 export function removeStamp(genreId: number): Passport {
