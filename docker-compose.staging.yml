@@ -7,6 +7,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: a-world-map-of-music-that-remembers-where-yo-staging-web
+    depends_on:
+      - api
     expose:
       - "80"
     environment:
@@ -22,6 +24,25 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # The ListenBrainz lookup proxy. Default network only: nginx fronts it,
+  # so it never joins the external staging network and publishes no port.
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    container_name: a-world-map-of-music-that-remembers-where-yo-staging-api
+    environment:
+      SENTRY_DSN: "${SENTRY_DSN:-}"
+    mem_limit: 128m
+    oom_score_adj: 800
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/healthz >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5

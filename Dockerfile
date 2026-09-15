@@ -7,6 +7,16 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
+# The ListenBrainz proxy: dependency-free Node, so no npm install here.
+FROM node:22-alpine AS api
+WORKDIR /app
+ENV NODE_ENV=production PORT=8081
+COPY server/ server/
+COPY data/genres.json data/genres.json
+USER node
+EXPOSE 8081
+CMD ["node", "server/index.mjs"]
+
 FROM nginx:alpine
 ENV SEED_DEMO="" \
     SENTRY_DSN="" \

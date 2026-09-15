@@ -12,6 +12,14 @@ export default defineConfig({
   },
   server: {
     host: "127.0.0.1",
+    // The ListenBrainz proxy. In the dev compose the api container is
+    // reached by service name; standalone dev falls back to localhost.
+    proxy: {
+      "/api": {
+        target: process.env.API_PROXY_TARGET ?? "http://127.0.0.1:8081",
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     host: "127.0.0.1",

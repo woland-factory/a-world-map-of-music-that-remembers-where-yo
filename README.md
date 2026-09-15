@@ -17,6 +17,12 @@ and pushes the frontier into the dark. Coming back on consecutive days
 builds a streak. Your streak and every crossing are saved in the same
 browser-local passport.
 
+Already scrobbling to ListenBrainz? Type your name in the passport and the
+map stamps the genres your public stats show, lighting your territory in
+seconds. The name is looked up once, never logged, and never stored. And
+"Make a poster" turns your lit map into a downloadable PNG, drawn entirely
+in your browser with no upload.
+
 ## How it works
 
 - An offline pipeline reads the MusicBrainz genre list, the artists tagged
@@ -34,6 +40,12 @@ browser-local passport.
   calendar date, finds the genres adjacent to your lit ones, and picks one
   deterministically, so the dare is identical all day and changes the next.
   Nothing runs in the background and no clock beyond the local date is used.
+- One runtime route exists: `GET /api/listenbrainz/:username` proxies a
+  user's public ListenBrainz genre stats and returns the genres that match
+  the atlas. The proxy is a dependency-free Node service in `server/`. It
+  validates and rate limits requests, keeps a short-lived cache in memory
+  only, writes nothing to disk, and never puts the name in a log line.
+  Everything else stays static and browser-local.
 
 ## Run it
 
@@ -46,9 +58,10 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Open http://127.0.0.1:8080. The demo passport is seeded by default, so you
-land on a partly-lit map. Set `SEED_DEMO=0` in `.env` to start with a dark
-map instead.
+Open http://127.0.0.1:8080. This brings up two containers: `web` (nginx
+serving the map) and `api` (the ListenBrainz proxy, reachable only through
+nginx). The demo passport is seeded by default, so you land on a partly-lit
+map. Set `SEED_DEMO=0` in `.env` to start with a dark map instead.
 
 To develop with hot reload:
 
@@ -106,8 +119,12 @@ and the app shows an honest resting state for those. The emit step rebuilds
   for the stage orchestration.
 - `web/` holds the single-page app (`web/src/map` for the canvas renderer
   and input, `web/src/audio` for playback, `web/src/ui` for the now-playing
-  panel, passport view, and dare card, `web/src/state` for the passport,
-  the daily dare logic, exemplars, and runtime config).
+  panel, passport view, dare card, and poster modal, `web/src/state` for
+  the passport, the daily dare logic, the ListenBrainz fill, exemplars,
+  and runtime config, `web/src/poster` for the poster drawing).
+- `server/` holds the ListenBrainz proxy: plain Node with no dependencies
+  (`lb.mjs` for the pure logic, `app.mjs` for the handler, `index.mjs` for
+  the bootstrap).
 - `data/` holds the committed atlas, the exemplar previews, and the
   resumable pipeline caches.
 

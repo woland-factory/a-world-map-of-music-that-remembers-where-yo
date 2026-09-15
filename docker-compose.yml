@@ -7,6 +7,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    depends_on:
+      - api
     ports:
       - "127.0.0.1:8080:80"
     environment:
@@ -18,6 +20,23 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # The ListenBrainz lookup proxy. No host port: nginx is the only path
+  # to it, and its response cache lives in memory only.
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    environment:
+      SENTRY_DSN: "${SENTRY_DSN:-}"
+    mem_limit: 128m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/healthz >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
