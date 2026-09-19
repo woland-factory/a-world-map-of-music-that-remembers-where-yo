@@ -1,5 +1,15 @@
 import { test, expect, type Page } from "@playwright/test";
 
+// Suppress the first-run walkthrough so these specs test their own feature.
+// Its own coverage lives in e2e/walkthrough.spec.ts.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem("walkthrough-done", "1");
+    } catch {}
+  });
+});
+
 // Read the renderer viewport that main.ts exposes for tests.
 async function viewport(page: Page): Promise<{ scale: number; offsetX: number; offsetY: number }> {
   return page.evaluate(() => (window as any).__renderer.vp);
@@ -63,17 +73,6 @@ test("keyboard zooms the map", async ({ page }) => {
   await page.keyboard.press("+");
   const after = await viewport(page);
   expect(after.scale).toBeGreaterThan(before.scale);
-});
-
-test("first-run orientation shows once, then never again", async ({ page }) => {
-  await page.goto("/");
-  await waitForMap(page);
-  await expect(page.locator("#orientation")).toBeVisible();
-  await page.locator("#got-it").click();
-  await expect(page.locator("#orientation")).toBeHidden();
-  await page.reload();
-  await waitForMap(page);
-  await expect(page.locator("#orientation")).toBeHidden();
 });
 
 test("failed atlas load shows the error state with a working reload", async ({ page }) => {

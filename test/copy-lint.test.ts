@@ -43,6 +43,13 @@ function visibleCopy(): string {
     "Tap the map to leap somewhere new.", // no-frontier body
     "Hide dare", // collapse control aria-label (expanded)
     "Show dare", // collapse control aria-label (collapsed)
+    // First-run walkthrough steps and Skip control (built in ui/walkthrough.ts).
+    "Pick a sound you love to start.", // dark step 1
+    "Play your dare to hear it.", // dark step 2
+    "Play today's dare to hear it.", // lit step 1
+    "Stamp it to cross the frontier.", // shared final step
+    "Skip", // skip button label
+    "Skip the walkthrough", // skip button aria-label
     // ListenBrainz proxy errors (built in server/app.mjs).
     "That name has a character ListenBrainz skips. Check it, or tap any genre to stamp it yourself.",
     "ListenBrainz can't find that name. Check the spelling, or tap any genre to stamp it yourself.",

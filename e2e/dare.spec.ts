@@ -1,5 +1,14 @@
 import { test, expect, type Page } from "@playwright/test";
 
+// Suppress the first-run walkthrough so this spec tests its own feature.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem("walkthrough-done", "1");
+    } catch {}
+  });
+});
+
 function seedEnv(page: Page, seed: "0" | "1"): Promise<void> {
   return page.route("**/env.js", (route) =>
     route.fulfill({

@@ -1,5 +1,14 @@
 import { test, expect, type Page } from "@playwright/test";
 
+// Suppress the first-run walkthrough so this spec tests its own feature.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem("walkthrough-done", "1");
+    } catch {}
+  });
+});
+
 // Every /api route is mocked with page.route: the e2e web server is the
 // static production build and the suite never touches the real proxy.
 

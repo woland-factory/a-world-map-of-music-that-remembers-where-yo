@@ -13,10 +13,14 @@ const context = await browser.newContext({
   deviceScaleFactor: 2,
 });
 const page = await context.newPage();
+// Suppress the first-run walkthrough so it does not cover the map in the shot.
+await page.addInitScript(() => {
+  try {
+    localStorage.setItem("walkthrough-done", "1");
+  } catch {}
+});
 await page.goto(url);
 await page.waitForFunction(() => !!window.__renderer, null, { timeout: 20000 });
-// Dismiss first-run orientation so it does not cover the map in the shot.
-await page.evaluate(() => document.getElementById("got-it")?.click());
 await page.waitForTimeout(1500);
 await page.screenshot({ path: "docs/layout.png" });
 await browser.close();

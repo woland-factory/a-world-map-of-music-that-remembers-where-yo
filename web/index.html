@@ -39,14 +39,11 @@
         </div>
       </div>
 
-      <!-- First-run orientation: shown once, then never again. -->
-      <div id="orientation" class="orientation" hidden>
-        <div class="card">
-          <p class="lead">A map of every music genre. The places you explore light up.</p>
-          <p class="hint">Tap a genre to hear it. Stamp the ones you love.</p>
-          <button id="got-it" type="button" class="primary">Got it</button>
-        </div>
-      </div>
+      <!-- First-run guided walkthrough: a non-modal coach mark that points at
+           the real controls one step at a time. Shown only on a first visit,
+           until the first crossing, then never again. Content is built in TS
+           with textContent. -->
+      <div id="walkthrough" class="walkthrough" aria-live="polite" hidden></div>
 
       <!-- Map controls. -->
       <div id="controls" class="controls" hidden>

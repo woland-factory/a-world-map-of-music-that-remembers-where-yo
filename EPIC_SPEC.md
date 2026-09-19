@@ -1,520 +1,463 @@
-# EPIC SPEC: Auto-fill from ListenBrainz, and the shareable poster
+# EPIC SPEC: First-run guided walkthrough
 
-Expand of the planner's EPIC 4 scope. Two deliverables:
+A skippable guided path that walks a brand-new visitor through lighting
+their first corner of the map, anchored to the real controls, one short
+step at a time. It appears only on a first visit, runs until the first
+frontier crossing, and never shows again.
 
-1. A thin, rate-limited, input-validated backend proxy,
-   `GET /api/listenbrainz/:username`, that fetches a user's public
-   ListenBrainz genre-activity stats and returns the genres that match the
-   atlas. The client turns those into ordinary passport stamps, lighting
-   the map in seconds.
-2. "Make a poster": a client-side PNG of the lit map, previewed in a modal
-   and downloadable. No account, no upload, no server involvement.
-
-This is the first EPIC that adds a runtime backend. Everything else in the
-product stays static and browser-local.
+This EPIC replaces the current static first-run card (`#orientation` /
+`maybeShowOrientation`) with an in-context coach mark. The old card is a
+single block of text the user reads and dismisses. The planner asks for
+the opposite: a path pinned to the actual buttons that advances as the
+user acts. Keeping both would give a new user two competing first-run
+surfaces, which breaks QUALITY BAR §7 (one obvious action) and the EPIC
+non-goal "no persistent help overlay." So the old card is removed and its
+job is done by the walkthrough. No new feature beyond the walkthrough is
+in scope.
 
 ## Quality differentiator (restated, binding)
 
 Delight through tactility: an instant, alive map you can hear. Touch
 anywhere and it plays, your own territory glows out of the dark, and the
-frontier visibly moves when you cross it.
+frontier visibly moves when you cross it. We win on the felt experience of
+a map you can hear and a world you are visibly filling in.
 
-What it demands of THIS EPIC: the fill must feel like the map catching
-fire, not like a form submission. The button gives feedback within 100ms,
-the stamps land in one batch (one repaint, one storage write), and on
-success the view frames the zoom-out so the newly lit territory is the
-first thing the user sees. The poster is the same glow, made portable:
-lit dots glowing out of the dark at print size, generated in under a
-second, with zero network traffic.
+What it demands of THIS EPIC: the walkthrough must make the new user
+*feel* the loop, not read about it. Within the first minute it makes them
+hear a genre, watch a dot light, and watch the frontier move one step into
+the dark. The coach mark points at the live control and gets out of the
+way. It never dims the map into a slideshow, never blocks a tap, and
+disappears the instant the user crosses their first frontier. The step
+copy is an imperative pointing at a button, never a paragraph explaining
+the product.
 
 ## Scope
 
 In scope:
 
-- New `server/` directory: a zero-dependency Node service (ESM
-  JavaScript, Node 22 built-in `fetch` and `http`) exposing
-  `GET /api/listenbrainz/:username` and `GET /healthz`.
-- Infra wiring: an `api` build target in the Dockerfile, an `api` service
-  in all three compose files, an nginx `location /api/` proxy block, and a
-  vite dev-server proxy for `/api`.
-- Passport sheet additions: a "Fill from ListenBrainz" section (input +
-  button + status line) and a "Make a poster" action.
-- Poster module: pure layout/draw code plus a modal with preview and
-  Download PNG.
-- Batch stamp application in `web/src/state/passport.ts` (one storage
-  write for N stamps).
-- Copy, tests (unit, integration, e2e with mocked `/api`), README update,
-  copy-lint additions.
+- A new non-modal coach-mark controller, `web/src/ui/walkthrough.ts`,
+  that highlights ONE real, on-screen control at a time with a one-
+  sentence caption plus a Skip control, and advances as the user performs
+  the real action.
+- Two short step scripts, chosen by whether the map starts dark or already
+  lit (SEED_DEMO), both anchored to the dare card's real controls:
+  - Dark first visit (empty passport): pick a starter, play the dare,
+    stamp it. Three steps.
+  - Lit first visit (seeded/staging): play the dare, stamp it. Two steps.
+- A first-visit gate and a one-time completion flag so the path shows only
+  on a genuine first visit and never again after the first crossing or a
+  Skip.
+- Wiring in `web/src/main.ts` so the controller advances off the events
+  the app already fires (a preview started, the passport changed, the dare
+  was completed). No new event plumbing beyond two notify calls.
+- Removal of the old orientation surface: markup in `web/index.html`, the
+  `maybeShowOrientation` function and `ORIENTATION_KEY` in
+  `web/src/ui/states.ts`, the `.orientation` CSS, the `#got-it` dismissal
+  in `scripts/shoot.mjs`, and the orientation e2e test.
+- Styles for the coach mark (existing tokens; 44px Skip target; visible
+  focus; reduced-motion respected).
+- Tests: pure-logic unit tests, an end-to-end walkthrough spec, a
+  one-line walkthrough-suppression helper added to the existing e2e specs
+  so they keep testing their own feature, and copy-lint additions.
 
 Out of scope (binding non-goals, from the planner):
 
-- No Spotify OAuth or connect. The word Spotify must not appear in the UI.
-- No Spotify data-export import in V1. It stays a recorded follow-up in
-  the product plan; do not build any part of it.
-- No server-side storage of any imported data. The proxy's response cache
-  is in-memory only, dies with the process, and never touches disk.
-- No account creation, no login, no server-side profiles.
-- Also out: persisting the typed username anywhere (server logs, server
-  disk, client localStorage), LB OAuth/tokens (public stats only), and
-  any new npm dependency for the server.
+- No multi-page tutorial. The path is at most three one-sentence steps.
+- No video, no animation showreel.
+- No persistent help overlay, "?" button, replay control, or re-open
+  affordance after the first crossing. Once done, the surface is gone for
+  good.
+- No new passport fields and no passport schema change. The only new
+  stored value is a single boolean flag in its own localStorage key.
+- No analytics/telemetry events for the walkthrough (keep it minimal).
+- No change to the map, audio, dare logic, ListenBrainz fill, or poster
+  beyond the two notify calls the controller needs.
 
-## Verified external contract (checked live, 2026-09-15)
+## Quality bar focus for this EPIC
 
-`GET https://api.listenbrainz.org/1/stats/user/{user_name}/genre-activity`
-
-- 200 body: `{"payload": {"genre_activity": [{"genre": "ambient",
-  "hour": 0, "listen_count": 405}, ...], "range": "all_time", ...}}`.
-  Genre names are lowercase MusicBrainz genre tags, the same vocabulary as
-  the atlas. One row per (genre, hour of day); sum `listen_count` across
-  hours per genre.
-- 204: stats not yet calculated for that user (valid user, empty body).
-- 404: unknown user.
-- No auth required for public stats. Send a descriptive `User-Agent`
-  (`world-map-of-music/1.0`). Read the shape defensively:
-  `body?.payload?.genre_activity ?? []`.
+- **First-run (§4).** This EPIC *is* the §4 "walk the first success"
+  clause. The path is 2 to 4 steps, each one short imperative sentence
+  anchored to a real control, skippable at any step, shown only until the
+  first success, never again for a returning user.
+- **Radically simple (§7).** One highlighted next step at a time. The
+  caption is a single imperative. No essay, no tooltip stack.
+- **Perceived speed (§1).** The coach mark never delays first render. It
+  appears only after the map is interactive and the dare card has drawn,
+  and it never blocks a tap on the control it points at.
+- **Mobile-first (§2) + Accessibility (§6).** Usable at 390px with no
+  horizontal scroll, Skip target at least 44px, focus moves to the
+  highlighted control with a visible focus ring, each step announced via
+  `aria-live`, keyboard reaches Skip and the control.
+- **Copy (§8).** Every step string and the Skip label are swept clean and
+  added to `test/copy-lint.test.ts`.
 
 ## Technical design
 
-### Architecture
+### Data model
 
-The shipped container today is nginx serving static files. Add a second
-container, `api`, built from the same Dockerfile via a new target. nginx
-proxies `/api/` to it by service name. The api container is never
-published on the host; nginx is the only path to it. No database, no
-migrations: the passport schema stays at v3 and LB stamps are ordinary
-stamps (date = the local day of the fill, no track fields, because the
-map did not play those tracks and must not claim it did).
+No migration. The passport stays at v3, untouched. The only new persisted
+value is a standalone flag:
 
-### New files
+- localStorage key `walkthrough-done`, value `"1"` once the walk finishes
+  (first crossing) or is skipped. Absent otherwise. Reads and writes are
+  wrapped in try/catch exactly like the existing `orientation-dismissed`
+  flag was, so private-mode storage failures never throw.
 
-- `server/lb.mjs`: pure, dependency-free logic, exported for tests.
-  - `validateUsername(raw)`: decode with `decodeURIComponent` (a
-    `URIError` means invalid), trim, require 1..64 chars, reject any of
-    control chars (U+0000..U+001F, U+007F), `/`, `\`. Returns
-    `{ok: true, name}` or `{ok: false}`.
-  - `matchGenres(genreActivity, atlasNameIndex)`: aggregate
-    `listen_count` per lowercased `genre` string, join against the atlas
-    by lowercased name, drop non-matches, sort by listenCount desc then
-    name asc, cap at 500 entries. Returns
-    `[{mbid, name, listenCount}]` using the atlas's canonical casing.
-  - `TtlCache(maxEntries)`: `get(key, now)` / `set(key, value, ttlMs,
-    now)`, evicts the oldest entry past `maxEntries` (500).
-  - `RateLimiter(limit, windowMs)`: sliding window per key,
-    `allow(key, now)`. 10 requests per minute per client IP.
-- `server/app.mjs`: `createHandler({atlas, fetchImpl, now, log,
-  reportError})` returning a `(req, res)` function. All time and I/O are
-  injected so tests never touch the network or the clock.
-- `server/index.mjs`: bootstrap. Reads `data/genres.json` (path from
-  `ATLAS_PATH`, default `data/genres.json`), builds the name index,
-  starts `http.createServer` on `PORT` (default 8081), host `0.0.0.0`.
-- `web/src/state/listenbrainz.ts`: DOM-free client flow,
-  `fillFromListenBrainz(name, deps)` with injected fetch and passport
-  ops. Returns `{ok, added, message}`.
-- `web/src/poster/poster.ts`: pure poster layout and drawing.
-- `web/src/ui/posterModal.ts`: the poster modal (preview, download,
-  focus management).
-- `test/server.test.ts`, `test/listenbrainz.test.ts`,
-  `test/poster.test.ts`, `e2e/listenbrainz.spec.ts`, `e2e/poster.spec.ts`.
+### First-visit gate (the "never again" logic)
 
-### Modified files
+The path shows if and only if BOTH hold:
 
-- `web/index.html`: LB section and poster button inside the passport
-  sheet, poster modal markup.
-- `web/src/ui/passportView.ts`: wire the LB form and poster button via
-  injected deps (`onFill`, `onPoster`).
-- `web/src/state/passport.ts`: add `addStamps(mbids: string[]): number`
-  (batch; resolves via the existing mbid map, skips already-stamped,
-  appends all, one `writePassport`, returns the number added).
-- `web/src/main.ts`: construct the deps, refresh renderer/dare/aria after
-  a fill, call `renderer.fit()` on a successful fill, Escape-key ordering
-  (poster modal first, then passport sheet, then now-playing, then dare).
-- `web/src/style.css`: styles for the new controls and modal (existing
-  tokens and patterns; 44px targets; visible focus).
-- `vite.config.ts`: `server.proxy` for `/api` to
-  `process.env.API_PROXY_TARGET ?? "http://127.0.0.1:8081"`.
-- `nginx.conf`, `Dockerfile`, `docker-compose.yml`,
-  `docker-compose.staging.yml`, `docker-compose.dev.yml`: wiring below.
-- `test/copy-lint.test.ts`: add every new dynamic string.
-- `README.md`: the proxy route, the privacy stance, the two-service run,
-  `server/` in the contribute map.
+1. **First visit**: no passport was in storage when the page loaded. This
+   is captured BEFORE `resolveInitialPassport` runs, because SEED_DEMO
+   writes a demo passport on first load and would otherwise mask a first
+   visit. Add `export function hasStoredPassport(): boolean` to
+   `web/src/state/passport.ts` (true when the `passport` key is present in
+   `safeStorage()`), and in `main.ts` compute
+   `const firstVisit = !hasStoredPassport()` before the
+   `await resolveInitialPassport(...)` call.
+2. **Not yet done**: `localStorage["walkthrough-done"] !== "1"`.
 
-### API contract
+Consequences, each a planner criterion:
 
-`GET /api/listenbrainz/:username`
+- A returning user with an existing passport fails gate 1 (a passport was
+  in storage at load), so the path never shows, even if the flag was never
+  written (for example a user who explored before this EPIC shipped).
+- A user who finished or skipped the path fails gate 2 on every later
+  visit.
+- On a first visit the flag is written the moment the user crosses their
+  first frontier (or taps Skip), so a mid-session reload after that does
+  not bring it back.
 
-Success (200), `Content-Type: application/json; charset=utf-8`:
+### `web/src/ui/walkthrough.ts`
 
-```json
-{ "stamps": [ { "mbid": "…", "name": "jazz", "listenCount": 412 } ],
-  "pending": false }
+Pure helpers (no DOM, unit-tested):
+
+```ts
+export type StepEvent = "audio" | "lit" | "dareDone";
+export type AnchorKey = "starter" | "darePlay" | "dareStamp";
+
+export interface Step {
+  text: string;        // one short imperative sentence
+  anchor: AnchorKey;   // which live control to point at
+  advance: StepEvent;  // the real event that completes this step
+}
+
+// The dark script starts from an empty passport (starter chips showing);
+// the lit script starts from a seeded/staging map (today's dare showing).
+export function walkScript(startedLit: boolean): Step[];
+
+export function shouldShowWalkthrough(firstVisit: boolean, done: boolean): boolean;
 ```
 
-- Upstream 204 maps to 200 with `{"stamps": [], "pending": true}`.
-- A valid user whose stats match nothing returns
-  `{"stamps": [], "pending": false}`.
-- `stamps` is capped at 500, sorted by `listenCount` desc.
+`walkScript(false)` (dark) returns exactly:
 
-Errors are always JSON of the shape `{"error": "<one product-voice
-sentence or two>"}`, never a stack trace, never HTML from the app itself:
+1. `{ text: "Pick a sound you love to start.", anchor: "starter", advance: "lit" }`
+2. `{ text: "Play your dare to hear it.", anchor: "darePlay", advance: "audio" }`
+3. `{ text: "Stamp it to cross the frontier.", anchor: "dareStamp", advance: "dareDone" }`
 
-| Case | Status | `error` body |
-| --- | --- | --- |
-| Invalid username (fails validation) | 400 | That name has a character ListenBrainz skips. Check it, or tap any genre to stamp it yourself. |
-| Upstream 404 (unknown user) | 404 | ListenBrainz can't find that name. Check the spelling, or tap any genre to stamp it yourself. |
-| Local rate limit exceeded | 429 (+ `Retry-After: 60`) | Lots of lookups right now. Wait a minute and try again. |
-| Upstream 429/5xx, network error, or 8s timeout | 502 | ListenBrainz didn't answer. Try again in a moment. |
-| Unexpected server exception | 500 | The lookup broke on our side. Try again in a moment. |
-| Unknown `/api/...` path | 404 | Check the address and try again. |
+`walkScript(true)` (lit) returns exactly:
 
-`GET /healthz` returns 200 `{"ok": true}` (compose healthcheck; not
-proxied by nginx).
+1. `{ text: "Play today's dare to hear it.", anchor: "darePlay", advance: "audio" }`
+2. `{ text: "Stamp it to cross the frontier.", anchor: "dareStamp", advance: "dareDone" }`
 
-All responses carry `X-Content-Type-Options: nosniff` and
-`Cache-Control: no-store` (the server-side cache is the proxy's own; the
-browser must not add a second, unbounded one).
+The DOM controller:
 
-### Server behavior (the security and privacy criteria live here)
+```ts
+export interface WalkthroughDeps {
+  root: HTMLElement;             // #walkthrough container
+  firstVisit: boolean;
+  startedLit: boolean;
+  baselineLit: number;          // lit count at load; "lit" advances when it rises
+  anchors: {
+    starter: () => HTMLElement | null;   // first .dare-chip
+    darePlay: () => HTMLElement | null;  // .dare-play
+    dareStamp: () => HTMLElement | null; // the dare's "Stamp it" button
+  };
+  expandDare: () => void;       // ensure the dare card is expanded before anchoring
+}
 
-- Routing: the handler receives the original URI including the `/api`
-  prefix (nginx forwards it unchanged). Route on
-  `/api/listenbrainz/<segment>` exactly; anything else under `/api` is
-  the JSON 404.
-- Rate limit: keyed by client IP, taken from the `X-Real-IP` header when
-  present (nginx sets it; the api port is never published so the header
-  is trustworthy), else the socket address. 10/min sliding window. The
-  429 must fire before any upstream call.
-- Cache: in-memory `TtlCache`, key = lowercased trimmed username.
-  TTLs: success 6h, upstream-404 5min, pending-204 10min. Max 500
-  entries. A cache hit performs no upstream call. Nothing is ever
-  written to disk.
-- Upstream call: `https://api.listenbrainz.org/1/stats/user/` +
-  `encodeURIComponent(name)` + `/genre-activity`, with
-  `AbortSignal.timeout(8000)` and the `User-Agent` above. Deduplicate
-  concurrent in-flight requests for the same name (one upstream call,
-  N waiters).
-- Privacy, non-negotiable: the username appears in no log line, no error
-  report, and no persistent store, on any code path. The only log format
-  is `lb <status> <ms>ms cache=<hit|miss|skip>` plus a fixed-string
-  startup line. `console.log(req.url)` or logging the error of a failed
-  upstream call verbatim (it can contain the URL) are defects; scrub by
-  never interpolating the URL or name into anything logged.
-- Error tracking: `reportError(dsn, err)` in `server/lb.mjs`. When
-  `SENTRY_DSN` is set, POST a minimal Sentry store payload (hand-rolled,
-  no SDK: parse the DSN, POST
-  `{scheme}://{host}/api/{projectId}/store/` with the `X-Sentry-Auth`
-  key header, body `{message: err.name + ": " + err.message}` after
-  replacing any occurrence of the current username with `[name]`).
-  Fire-and-forget, wrapped in catch, called only for unexpected
-  exceptions (the 500 path). When the env is absent it is a no-op.
-
-### Client fill flow
-
-Passport sheet gains a section under the stamp list, above the existing
-actions row:
-
-```html
-<section class="ps-fill" aria-labelledby="lb-heading">
-  <h3 id="lb-heading">Fill from ListenBrainz</h3>
-  <p class="ps-hint">Stamps the genres your public stats show. Looked up once, never stored.</p>
-  <form id="lb-form">
-    <label for="lb-name">ListenBrainz name</label>
-    <input id="lb-name" type="text" autocomplete="off" spellcheck="false" maxlength="64" placeholder="e.g. rob" />
-    <button id="lb-fill" class="primary" type="submit">Light my map</button>
-  </form>
-  <p id="lb-status" class="ps-msg" role="status" aria-live="polite" hidden></p>
-</section>
-```
-
-Flow in `fillFromListenBrainz(name, deps)`:
-
-1. Trim. Empty: return the local message "Type a ListenBrainz name
-   first, or tap any genre to stamp it yourself." without any fetch.
-2. Show busy state within 100ms: disable the button, set `#lb-status`
-   to "Looking up your genres."
-3. `fetch("/api/listenbrainz/" + encodeURIComponent(name))`. Any network
-   failure or non-JSON body (nginx 502 while the api restarts, for
-   example) maps to "ListenBrainz didn't answer. Try again in a moment."
-4. Error JSON: show `body.error` verbatim in `#lb-status`.
-5. 200 with `pending: true`: "ListenBrainz is still adding up your
-   stats. Try again later, or tap any genre to stamp it yourself."
-6. 200 with stamps but zero matches after `addStamps` because all were
-   already lit: "Your map already shows those genres."
-7. 200 with an empty `stamps` array: "Your stats use tags this map
-   skips. Tap any genre to stamp it yourself."
-8. 200 with `added > 0`: apply via `addStamps(mbids)` (ONE storage
-   write, then one `applyPassportChange`-style refresh in main.ts:
-   renderer lit set, aria-label, passport view, `ensureDare`). Then
-   `renderer.fit()` so the zoom-out frames the newly lit territory, and
-   show "Lit 24 new genres from your travels." (singular: "Lit 1 new
-   genre from your travels.").
-
-Rules:
-
-- The username is never persisted client-side (no localStorage, no URL
-  param). The input keeps its in-session value only.
-- Auto-filled stamps never call `completeDare` and never bump the
-  streak. If the fill happens to stamp today's dare genre, the existing
-  `ensureDare` logic marks the dare done without a streak bump. The
-  streak stays a record of dares actually taken.
-- Framing: all copy in this feature says stamps, stats, travels, and
-  explored. The strings "listening history" and "your history" must not
-  appear anywhere in the UI.
-
-### Poster
-
-Trigger: a "Make a poster" button in the passport sheet's actions row.
-Modal markup (sibling of the passport sheet, above it in z-order):
-
-```html
-<div id="poster" class="poster-modal" role="dialog" aria-modal="true" aria-labelledby="poster-heading" hidden>
-  <div class="poster-inner">
-    <header>
-      <h2 id="poster-heading">Your poster</h2>
-      <button id="poster-close" class="sheet-close" type="button" aria-label="Close">&times;</button>
-    </header>
-    <p id="poster-wait" role="status">Printing your map.</p>
-    <img id="poster-img" alt="Poster of your lit map" hidden />
-    <div class="poster-actions">
-      <button id="poster-download" class="primary" type="button" hidden>Download PNG</button>
-    </div>
-  </div>
-</div>
-```
-
-`web/src/poster/poster.ts`:
-
-- Constants: width 1080, height 1350 (4:5 portrait), background
-  `BACKGROUND` from `web/src/map/colors.ts`.
-- `fitTransform(bounds, rect)`: pure. Fits the atlas bounds into a
-  target rect preserving aspect, centered. Handles degenerate bounds
-  (width or height 0) without dividing by zero. Returns
-  `{scale, dx, dy}`.
-- `posterCountLine(lit, total)`: pure. `"412 of 2,197 genres lit"`,
-  numbers via `toLocaleString("en-US")`.
-- `posterDateLine(date)`: pure. `"September 15, 2026"` via
-  `toLocaleDateString("en-US", {year: "numeric", month: "long",
-  day: "numeric"})`.
-- `drawPoster(canvas, atlas, lit, opts: {dateLabel, host})`: sets the
-  canvas to 1080x1350, fills the background, fits the map into the rect
-  x 60..1020, y 170..1120 using `fitTransform`. Draws unlit dots first
-  (radius 2, `UNLIT_COLOR`), then lit dots (radius 5, `regionColor`,
-  `shadowBlur` 14 in the dot's own color), mirroring the live
-  renderer's draw order so glow reads over the dark field. Text, all
-  `system-ui` so nothing loads over the network: title "A world map of
-  music" (600 34px, centered, y 96, `rgba(233,238,246,0.92)`), the
-  count line (600 44px, centered, y 1210), and one footer line (400
-  24px, centered, y 1268, `rgba(148,163,184,0.9)`) with the date label
-  and, when non-empty, the host separated by a middot, for example
-  "September 15, 2026 · music.example.org".
-- `makePosterBlob(atlas, lit, opts)`: draws on a fresh offscreen canvas
-  and resolves `canvas.toBlob` as a PNG `Blob`. Rejects only if the
-  browser returns null.
-
-`web/src/ui/posterModal.ts` behavior:
-
-- Open: show the modal immediately with the "Printing your map." status
-  (feedback within 100ms), move focus to Close, then on the next frame
-  generate the blob, set `#poster-img.src` to an object URL, reveal the
-  image and Download, hide the status.
-- Download: an anchor click with `download="music-map-poster.png"` on
-  the same object URL.
-- Close (button or Escape): hide, revoke the object URL, restore focus
-  to the element that opened it. Escape closes the poster before the
-  passport sheet (ordering in main.ts's keydown handler).
-- The host passed in is `window.location.host`; pass an empty string
-  when it starts with `localhost` or `127.0.0.1` so local posters skip
-  the footer host.
-- No fetches of any kind on this path. The canvas draws no external
-  images (no artwork), so `toBlob` can never hit a tainted-canvas error.
-
-### Infra wiring
-
-Dockerfile: add a target before the nginx stage.
-
-```dockerfile
-FROM node:22-alpine AS api
-WORKDIR /app
-ENV NODE_ENV=production PORT=8081
-COPY server/ server/
-COPY data/genres.json data/genres.json
-USER node
-EXPOSE 8081
-CMD ["node", "server/index.mjs"]
-```
-
-nginx.conf: add above the `location /` block.
-
-```nginx
-location /api/ {
-  resolver 127.0.0.11 valid=30s ipv6=off;
-  set $api_upstream api;
-  proxy_pass http://$api_upstream:8081;
-  proxy_set_header X-Real-IP $remote_addr;
-  proxy_read_timeout 15s;
+export class Walkthrough {
+  constructor(deps: WalkthroughDeps);
+  start(): void;                              // no-op unless the gate passes
+  noteAudio(): void;                          // a preview began playing
+  noteLit(litCount: number, dareDone: boolean): void; // passport changed
+  skip(): void;                               // dismiss + persist done
+  get active(): boolean;
 }
 ```
 
-(The variable form makes nginx resolve at request time, so the web
-container starts and serves the map even if the api container is down;
-the client copy covers the resulting 502.)
+Controller behavior:
 
-Compose:
+- `start()`: return immediately (no UI, `active` stays false) unless
+  `shouldShowWalkthrough(firstVisit, done)`. Otherwise pick the script by
+  `startedLit`, set the step index to 0, and render the first resolvable
+  step.
+- Rendering a step: call `expandDare()`, resolve the step's anchor
+  element. If the anchor is null, advance to the next step (see
+  robustness). Otherwise position the ring over the anchor's bounding rect
+  and set the caption text, then move focus to the anchor.
+- Advancing on an event: `noteAudio()` advances the current step when its
+  `advance` is `"audio"`; `noteLit(n, done)` advances when the step's
+  `advance` is `"lit"` and `n > baselineLit`, or when it is `"dareDone"`
+  and `done` is true. An event that does not match the current step is
+  ignored. When the last step advances, finish.
+- **Robustness**: if a step's anchor cannot resolve at render time (for
+  example the dare has no playable preview so `.dare-play` is absent), the
+  controller advances past it to the next resolvable step. If no step
+  resolves, it finishes silently. The path never draws a ring pointing at
+  nothing and never stalls.
+- `skip()` and finishing both: hide the container, remove the ring and
+  caption, detach the resize/reposition listeners, and write
+  `walkthrough-done = "1"`. After either, `active` is false and no event
+  reopens it.
+- Reposition the ring on `window` resize and on the next frame after each
+  advance (the dare card changes height between the starter and dare
+  views). Anchors are fixed-position UI controls, never moving map dots,
+  so no map-coordinate tracking is needed.
 
-- `docker-compose.yml`: add service `api` (build target `api`, no host
-  port, `SENTRY_DSN` passed through, `mem_limit: 128m`,
-  `restart: unless-stopped`, healthcheck
-  `wget -qO- http://127.0.0.1:8081/healthz`). `web` gets
-  `depends_on: [api]`.
-- `docker-compose.staging.yml`: same `api` service with
-  `container_name: a-world-map-of-music-that-remembers-where-yo-staging-api`,
-  on the default network only (NOT the external staging network; nginx
-  fronts it), `oom_score_adj: 800`. `web` gets `depends_on: [api]`.
-- `docker-compose.dev.yml`: add `api` service (image `node:22-alpine`,
-  same volume mounts, `command: node server/index.mjs`, no host port)
-  and set `API_PROXY_TARGET: http://api:8081` in the `web` service env
-  so the vite proxy reaches it.
+DOM built in TS with `textContent` (never `innerHTML`), mirroring the dare
+card, so no user or genre string can ever inject markup:
 
-`.env.example` needs no new keys (PORT and ATLAS_PATH have safe
-defaults; there are no new secrets).
+- `.wt-ring` (aria-hidden) positioned absolutely over the anchor,
+  `pointer-events: none` so taps reach the control beneath it.
+- `.wt-caption` containing `<p class="wt-text">` (the step sentence) and
+  `<button type="button" class="wt-skip" aria-label="Skip the walkthrough">Skip</button>`.
+  The caption has `pointer-events: auto` so Skip is tappable; nothing else
+  overlays the highlighted control.
+
+### `web/index.html`
+
+Remove the `#orientation` block (the card, its two paragraphs, and the
+`#got-it` button). Add one container near the other overlays:
+
+```html
+<!-- First-run guided walkthrough: a non-modal coach mark that points at
+     the real controls one step at a time. Shown only on a first visit,
+     until the first crossing, then never again. Content is built in TS
+     with textContent. -->
+<div id="walkthrough" class="walkthrough" aria-live="polite" hidden></div>
+```
+
+### `web/src/ui/states.ts`
+
+Remove `maybeShowOrientation`, the `ORIENTATION_KEY` constant, and the
+orientation logic. Keep `hideSkeleton` and `showError` unchanged.
+
+### `web/src/main.ts`
+
+- Compute `firstVisit` before `resolveInitialPassport` (see gate).
+- After the passport resolves, compute
+  `const baselineLit = countLit(atlas, litSet(passport))`.
+- Replace the `maybeShowOrientation()` call. Construct the walkthrough at
+  the END of `start()`, after `dareCard.render()` and `warmDare()`, so its
+  anchors (starter chips or the dare's Play / Stamp it) already exist:
+
+  ```ts
+  const walkthrough = new Walkthrough({
+    root: el("walkthrough"),
+    firstVisit,
+    startedLit: baselineLit > 0,
+    baselineLit,
+    anchors: {
+      starter: () => el("dare").querySelector<HTMLElement>(".dare-chip"),
+      darePlay: () => el("dare").querySelector<HTMLElement>(".dare-play"),
+      dareStamp: () =>
+        [...el("dare").querySelectorAll<HTMLElement>("button")].find(
+          (b) => b.textContent === "Stamp it",
+        ) ?? null,
+    },
+    expandDare: () => dareCard?.expand(),
+  });
+  walkthrough.start();
+  ```
+
+- Advance the walkthrough off events already fired:
+  - In `select()`, immediately after `player.play(exemplar.previewUrl)`
+    (the branch where an exemplar exists), call `walkthrough.noteAudio()`.
+  - In the dare card's `onPlay`, after `player.play(ex.previewUrl)`, call
+    `walkthrough.noteAudio()`.
+  - At the END of `applyPassportChange()`, after the dare is synced, call
+    `walkthrough.noteLit(countLit(atlas, litSet(getPassport())), getDare()?.done === true)`.
+    This runs after every stamp, starter pick, and dare completion, so the
+    `"lit"` and `"dareDone"` steps advance without new plumbing.
+  - Because `walkthrough` is declared after `applyPassportChange` in the
+    current file order, hold it in a `let walkthrough: Walkthrough | undefined`
+    declared before `applyPassportChange` and guard the notify calls with
+    `walkthrough?.` (same pattern already used for `dareCard`).
+- Extend the Escape keydown chain as the LAST branch, after the dare:
+  `else if (walkthrough?.active) walkthrough.skip();`. Order stays: poster,
+  passport sheet, now-playing, dare, then walkthrough.
+
+### `web/src/style.css`
+
+Remove the `.orientation` rules (base and the 390px media-query block).
+Add `.walkthrough`, `.wt-ring`, `.wt-caption`, `.wt-text`, `.wt-skip`
+using existing color and spacing tokens:
+
+- `.walkthrough` is a full-viewport, `position: fixed`, `pointer-events:
+  none` layer (so it never blocks the map). Only `.wt-caption` re-enables
+  pointer events.
+- `.wt-ring`: a 2px accent-colored outline with a soft glow (box-shadow),
+  border-radius to hug a button, `pointer-events: none`. Under
+  `prefers-reduced-motion: reduce`, no pulse animation (static ring).
+- `.wt-skip`: at least 44px tall, visible `:focus-visible` outline,
+  readable contrast.
+- The caption is clamped inside the viewport at 390px (no horizontal
+  scroll), positioned near the anchor (above it when the anchor is in the
+  lower half, below when in the upper half).
+
+### `scripts/shoot.mjs`
+
+Replace the `#got-it` dismissal with suppressing the walkthrough before
+navigation, so screenshots are never covered:
+
+```js
+await page.addInitScript(() => {
+  try { localStorage.setItem("walkthrough-done", "1"); } catch {}
+});
+```
+
+(Place it before `page.goto`; drop the post-load `#got-it` click.)
 
 ### Copy inventory (final strings, sweep-clean; ship these verbatim)
 
-Already listed in the API table and flows above, plus:
+- Dark step 1: `Pick a sound you love to start.`
+- Dark step 2 / lit step 2 label reuse: `Play your dare to hear it.`
+- Lit step 1: `Play today's dare to hear it.`
+- Shared final step: `Stamp it to cross the frontier.`
+- Skip button label: `Skip`
+- Skip button aria-label: `Skip the walkthrough`
 
-- Section heading: "Fill from ListenBrainz"
-- Hint: "Stamps the genres your public stats show. Looked up once, never stored."
-- Input label: "ListenBrainz name"; placeholder: "e.g. rob"
-- Button: "Light my map"
-- Busy: "Looking up your genres."
-- Poster button: "Make a poster"; modal heading "Your poster"; status
-  "Printing your map."; action "Download PNG"; image alt "Poster of
-  your lit map".
-
-Every one of these, and every string in the API error table, goes into
-the dynamic-strings list in `test/copy-lint.test.ts`.
+No em or en dashes, no banned vocabulary, no negative phrasing. Every one
+of these goes into the dynamic-strings list in
+`test/copy-lint.test.ts`.
 
 ## Ordered task list
 
-### T1: The proxy service
+### T1: The walkthrough controller and its pure logic
 
-Build `server/lb.mjs`, `server/app.mjs`, `server/index.mjs` exactly per
-the design, plus `test/server.test.ts`.
-
-Acceptance criteria:
-
-- `node server/index.mjs` starts with only the repo checked out (no
-  `npm install` needed by the server itself) and serves `/healthz`.
-- `validateUsername` accepts "rob" and names with inner spaces, rejects
-  empty, whitespace-only, longer than 64, slashes, backslashes, control
-  characters, and malformed percent-encoding.
-- `matchGenres` sums hourly rows per genre, matches case-insensitively
-  against the atlas name index, drops unmatched tags, sorts by count
-  desc, caps at 500.
-- Handler (integration-tested through a real `http` server on port 0
-  with an injected fake `fetchImpl`): 200/204/404/timeout/network-error
-  upstream cases and the local 400/429 cases all return exactly the
-  statuses and JSON bodies in the API table. The 400 and 429 paths make
-  zero upstream calls. A second request for the same name is served
-  from cache with `fetchImpl` called once. The injected `log` capture,
-  concatenated across every test case, never contains the username.
-- No new entries in `package.json` `dependencies`.
-
-### T2: Ship it behind nginx
-
-Dockerfile target, nginx block, three compose files, vite dev proxy,
-README, `.env.example` untouched.
+Build `web/src/ui/walkthrough.ts`: the `walkScript`,
+`shouldShowWalkthrough` helpers and the `Walkthrough` class exactly per
+the design. Add `hasStoredPassport()` to `web/src/state/passport.ts`.
 
 Acceptance criteria:
 
-- `docker compose up --build` brings up `web` and `api`, both healthy.
-- `curl http://127.0.0.1:8080/api/listenbrainz/a%2Fb` returns the 400
-  product-voice JSON through nginx (deterministic, no upstream call, so
-  it verifies the full proxy chain offline).
-- `curl http://127.0.0.1:8080/` still serves the app; static behavior,
-  caching headers, and the staging file's network layout are unchanged
-  except for the additions above.
-- The api container publishes no host port in any compose file and does
-  not join the external staging network.
-- README explains the one runtime route in a sentence, states the
-  privacy stance (looked up once, never logged, never stored), and the
-  Run/Contribute sections match the actual files.
+- `walkScript(false)` returns the three dark steps in order with the exact
+  strings above; `walkScript(true)` returns the two lit steps. Both end on
+  a `"dareDone"` step anchored to `dareStamp`.
+- `shouldShowWalkthrough(firstVisit, done)` is true only when
+  `firstVisit && !done`.
+- `hasStoredPassport()` returns true when the `passport` key exists in
+  storage and false when it is absent or storage is unavailable, without
+  throwing.
 
-### T3: Fill from ListenBrainz in the passport sheet
+### T2: Wire it into the app and remove the old orientation
 
-`web/src/state/listenbrainz.ts`, `addStamps` in passport.ts, markup in
-index.html, wiring in passportView.ts and main.ts, styles,
-`test/listenbrainz.test.ts`, `e2e/listenbrainz.spec.ts` (all `/api`
-routes mocked with `page.route`; the e2e web server is static).
+Add the `#walkthrough` container, remove `#orientation` markup, delete
+`maybeShowOrientation`/`ORIENTATION_KEY`, wire the controller and the
+three notify points into `main.ts`, extend the Escape chain, add the CSS,
+and remove the `.orientation` CSS. Update `scripts/shoot.mjs`.
 
 Acceptance criteria:
 
-- `addStamps` applies N stamps with exactly one localStorage write,
-  skips already-stamped and unknown mbids, and returns the added count.
-- Submitting a mocked valid name lights the map: lit count in the
-  canvas aria-label and the passport count line both rise by the number
-  of new stamps, the stamps persist across reload, the view returns to
-  fit, and the success message shows the count.
-- The busy status appears while a delayed mocked response is in flight
-  (feedback within 100ms of the click).
-- Empty and whitespace names show the local message and trigger no
-  `/api` request; mocked 404 and 502 show their exact product-voice
-  strings and change nothing.
-- Auto-filled stamps carry today's date and no track fields, and the
-  streak count is unchanged after a fill that includes the dare genre.
-- The username is absent from localStorage after a successful fill and
-  a reload.
-- New controls are keyboard reachable, labeled, at least 44px tall, and
-  work at a 390px viewport with no horizontal scroll.
+- On a dark first visit (SEED_DEMO=0, empty storage), step 1 points at a
+  starter chip. Picking one advances to step 2 pointing at the dare's Play
+  button; playing advances to step 3 pointing at "Stamp it"; stamping
+  crosses the frontier and the coach mark disappears.
+- On a lit first visit (SEED_DEMO=1, empty storage), step 1 points at the
+  dare's Play button and step 2 at "Stamp it"; stamping crosses the
+  frontier and the coach mark disappears.
+- The coach mark never overlays or blocks the control it points at: the
+  highlighted button is clickable and tappable throughout.
+- The old orientation card no longer exists anywhere in the DOM or CSS,
+  and `scripts/shoot.mjs` no longer references `#got-it`.
 
-### T4: The poster
-
-`web/src/poster/poster.ts`, `web/src/ui/posterModal.ts`, markup,
-wiring, styles, `test/poster.test.ts`, `e2e/poster.spec.ts`.
+### T3: The "never again" and staging behavior
 
 Acceptance criteria:
 
-- `fitTransform` centers and preserves aspect for wide, tall, and
-  degenerate bounds; `posterCountLine(412, 2197)` is exactly
-  "412 of 2,197 genres lit".
-- On a seeded map, "Make a poster" opens the modal within 100ms, shows
-  the preview image (naturalWidth 1080, naturalHeight 1350), and the
-  Download button saves `music-map-poster.png` whose file size is over
-  20 kB.
-- Zero non-origin requests occur between opening the modal and the
-  completed download (asserted with a request listener in the e2e).
-- Escape closes the modal before the passport sheet, focus returns to
-  the opener, and the object URL is revoked on close.
-- Works at a 390px viewport: modal fits, no horizontal scroll, buttons
-  at least 44px.
+- After the first crossing, `walkthrough-done` is `"1"` and a reload does
+  not show the path again.
+- Tapping Skip at any step hides the path, writes the flag, and a reload
+  does not show it again, even when no stamp was made.
+- A returning user whose browser already holds a passport (seeded via
+  `addInitScript` before load) never sees the path, with or without the
+  flag.
+- On staging behavior (SEED_DEMO=1, no hand-crafted input), a brand-new
+  visitor reaches the frontier-crossing signature moment through the two
+  lit steps in well under a minute: the lit count rises by one, the dare
+  card flips to "Frontier moved.", and the path is gone.
 
-### T5: Copy sweep and final gates
+### T4: Mobile, accessibility, and copy sweep
 
 Acceptance criteria:
 
-- Every new user-visible string (index.html additions plus the dynamic
-  strings from server errors, fill messages, and poster) is appended to
-  `test/copy-lint.test.ts` and the sweep passes: no em or en dashes, no
-  banned vocabulary, no negative empty-state phrasing.
-- The strings "listening history", "Spotify", and "OAuth" appear in no
-  user-visible string (grep across `web/` and `server/`).
+- At a 390px viewport the coach mark and its caption fit with no
+  horizontal scroll, and the Skip target is at least 44px tall.
+- Focus moves to the highlighted control when a step appears, with a
+  visible focus ring; Tab reaches the Skip button; Escape skips the path
+  when no dialog is open.
+- Each step's sentence is announced through the `aria-live` container.
+- Every new user-visible string is in `test/copy-lint.test.ts` and the
+  sweep passes: no em or en dashes, no banned vocabulary, no negative
+  empty-state phrasing.
 - `npm test`, `npm run typecheck`, and `./scripts/e2e.sh` all pass.
 
 ## Test plan (planner criterion to proof)
 
+New unit test `test/walkthrough.test.ts`:
+
+- `walkScript(false)` and `walkScript(true)` return the exact step arrays
+  (order, text, anchor, advance).
+- `shouldShowWalkthrough` truth table.
+- `hasStoredPassport()` true/false/unavailable cases.
+
+New e2e `e2e/walkthrough.spec.ts` (mirrors the helpers in `dare.spec.ts`:
+`seedEnv`, `waitForMap`, `litCount`):
+
+- **Dark path**: SEED_DEMO=0, empty storage. Assert the step 1 caption
+  text and that the ring overlaps a `.dare-chip` bounding box. Pick a
+  chip, assert step 2 text and the ring over `.dare-play`, click Play and
+  wait for `__nowPlaying.playing`, assert step 3 text and the ring over
+  "Stamp it", click it. Assert lit count rose, the dare shows "Frontier
+  moved.", `#walkthrough` is hidden, and `localStorage["walkthrough-done"]`
+  is `"1"`.
+- **Lit path**: SEED_DEMO=1, empty storage. Assert step 1 over
+  `.dare-play`, Play, step 2 over "Stamp it", stamp. Assert the crossing
+  and that the path is gone.
+- **Never again**: after finishing, reload and assert `#walkthrough` stays
+  hidden. Separately, Skip on first load, reload, assert it stays hidden.
+- **Returning user**: `addInitScript` writes a minimal valid passport to
+  localStorage before `goto`; assert `#walkthrough` never becomes visible.
+- **Mobile + a11y**: 390px viewport. Assert no horizontal scroll, the Skip
+  button box height is at least 44px, focus is on the anchored control when
+  a step shows, Tab reaches Skip, and Escape hides the path.
+
 | Planner criterion | Proof |
 | --- | --- |
-| Proxy validates, rate-limits, caches, never logs the name, product-voice errors | `test/server.test.ts`: validation matrix; 429 after 10 requests in a window with no upstream call; single-fetch cache assertion; log-capture-never-contains-name assertion across all cases; exact error-body assertions for 400/404/429/502/500. T2 curl check proves the chain through nginx. |
-| Valid name lights the map in seconds; unknown or empty name shows a positive, actionable message and offers manual stamping | `e2e/listenbrainz.spec.ts` (mocked routes): success path asserts lit count, persistence, fit, message; 404/empty paths assert exact strings containing the manual-stamp offer and an unchanged map. `test/listenbrainz.test.ts` covers every status-to-message mapping without a DOM. |
-| Make a poster renders a downloadable client-side PNG, no account, no upload | `e2e/poster.spec.ts`: download event with the right filename and size, preview dimensions, zero non-origin requests during the flow. `test/poster.test.ts` proves the pure layout math and text. |
-| Framing stays exploration-record; copy sweep clean | `test/copy-lint.test.ts` extended with every new string; T5 grep for "listening history"; stamp shape (today's date, no track fields) asserted in `test/listenbrainz.test.ts`. |
+| First visit shows a 2 to 4 step path pointing at real controls, one short imperative each, skippable at any step | `walkthrough.test.ts` proves both scripts are 2 or 3 steps with the exact imperative strings. `e2e/walkthrough.spec.ts` dark and lit paths prove each step's ring overlaps the real control (chip, Play, "Stamp it") and that Skip dismisses at any step. |
+| Walks the real core action once (stamp, hear, light, dare) using the real controls, not a modal essay | The dark path drives pick to Play to Stamp against the live dare card; the lit path drives Play to Stamp. Each step advances only when the app fires the real event (`__nowPlaying.playing`, lit count rising, dare done). The mobile test asserts the coach mark never blocks the control it points at. |
+| After first success never again; a returning user with a passport never sees it | The "never again" and "returning user" e2e cases: reload after a crossing, reload after Skip, and a pre-seeded passport, all keep `#walkthrough` hidden. `walkthrough.test.ts` proves the gate. |
+| On staging, a new visitor reaches the signature moment within a minute without hand-crafted input (SEED_DEMO) | The lit-path e2e runs SEED_DEMO=1 with empty storage and reaches "Frontier moved." with a rising lit count through two taps, no typed input. |
+| Mobile-first, keyboard reachable with visible focus, copy sweep clean | The mobile + a11y e2e case (390px, 44px Skip, focus on the anchor, Tab to Skip, Escape). `test/copy-lint.test.ts` extended with every new string; T4 requires the full sweep and suites to pass. |
 
 Notes for the implementer:
 
-- The e2e suite runs against `vite preview` (static only). Every
-  ListenBrainz e2e test must mock `/api/**` with `page.route`; none may
-  depend on the real proxy or the network. The real proxy is proven by
-  the vitest integration tests and the T2 curl check.
-- The existing export/import e2e asserts zero non-origin requests; the
-  mocked `/api` routes are same-origin, so nothing there changes.
-- `test/scaffold.test.ts` guards `.env.example`; it needs no changes
-  since no keys are added. Do not add secret-looking values anywhere.
+- The e2e suite runs against `vite preview` (static). The walkthrough
+  needs no network. Keep using `seedEnv` to control SEED_DEMO and
+  `addInitScript` to pre-write storage.
+- The existing seeded e2e specs (`dare.spec.ts`, `passport.spec.ts`,
+  `listenbrainz.spec.ts`, `poster.spec.ts`) run with empty storage and
+  SEED_DEMO on, so they would now trigger the walkthrough. Add
+  `await page.addInitScript(() => { try { localStorage.setItem("walkthrough-done","1"); } catch {} })`
+  before `goto` in each of those specs so they keep testing their own
+  feature. This is a mechanical, per-spec edit; do not weaken their
+  assertions.
+- Remove the "first-run orientation shows once, then never again" test in
+  `e2e/map.spec.ts`; its coverage moves to `e2e/walkthrough.spec.ts`. The
+  map spec's other tests do not open the dare-anchored path, but add the
+  same suppression init script there too for determinism.
+- The walkthrough starts only after `dareCard.render()`, so its anchors
+  always exist on a first visit. If exemplars fail to load and the dare
+  has no Play button, the controller's robustness rule advances past the
+  audio step; the crossing step still works.

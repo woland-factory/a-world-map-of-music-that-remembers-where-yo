@@ -1,6 +1,15 @@
 import { test, expect, type Page } from "@playwright/test";
 import { statSync } from "node:fs";
 
+// Suppress the first-run walkthrough so this spec tests its own feature.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem("walkthrough-done", "1");
+    } catch {}
+  });
+});
+
 async function waitForMap(page: Page): Promise<void> {
   await expect(page.locator("#map")).toBeVisible();
   await page.waitForFunction(() => !!(window as any).__renderer, null, { timeout: 20_000 });

@@ -17,6 +17,7 @@ import {
   getDare,
   todayString,
   addStamps,
+  hasStoredPassport,
 } from "./state/passport";
 import { fillFromListenBrainz } from "./state/listenbrainz";
 import { PosterModal } from "./ui/posterModal";
@@ -27,7 +28,8 @@ import { NowPlaying } from "./ui/nowPlaying";
 import { DareCard } from "./ui/dareCard";
 import { PassportView } from "./ui/passportView";
 import { countLit } from "./map/lit";
-import { hideSkeleton, showError, maybeShowOrientation } from "./ui/states";
+import { hideSkeleton, showError } from "./ui/states";
+import { Walkthrough } from "./ui/walkthrough";
 import { initTelemetry } from "./telemetry";
 
 async function loadAtlas(): Promise<Atlas> {
@@ -72,7 +74,12 @@ async function start(): Promise<void> {
     (window as unknown as { __exemplarsReady?: boolean }).__exemplarsReady = true;
   });
 
+  // Capture a genuine first visit BEFORE resolveInitialPassport, because
+  // SEED_DEMO writes a demo passport on first load and would otherwise mask it.
+  const firstVisit = !hasStoredPassport();
+
   const passport = await resolveInitialPassport(atlas, exemplarsPromise);
+  const baselineLit = countLit(atlas, litSet(passport));
   const todayStr = todayString();
   const byId = new Map(atlas.genres.map((g) => [g.id, g]));
   const renderer = new MapRenderer(canvas, atlas, litSet(passport));
@@ -103,6 +110,7 @@ async function start(): Promise<void> {
   };
 
   let dareCard: DareCard | undefined;
+  let walkthrough: Walkthrough | undefined;
 
   const nowPlaying = new NowPlaying(el("now-playing"), {
     onStamp: () => {
@@ -135,6 +143,9 @@ async function start(): Promise<void> {
       ensureDare(atlas, exemplars, todayStr);
       dareCard.render();
     }
+    // Advance the walkthrough off the real passport change: a starter pick
+    // lights the map, a stamp crosses the frontier. Runs after the dare synced.
+    walkthrough?.noteLit(countLit(atlas, litSet(getPassport())), getDare()?.done === true);
   };
 
   const posterModal = new PosterModal(document, {
@@ -189,8 +200,10 @@ async function start(): Promise<void> {
     const exemplar = getExemplar(exemplars, genre);
     nowPlaying.show(genre, exemplar, isStamped(genre.id), stampFor(genre.id)?.date);
     setHook(genre, !!exemplar, !!exemplar);
-    if (exemplar) player.play(exemplar.previewUrl);
-    else player.stop();
+    if (exemplar) {
+      player.play(exemplar.previewUrl);
+      walkthrough?.noteAudio();
+    } else player.stop();
   };
 
   const deselect = (): void => {
@@ -218,7 +231,10 @@ async function start(): Promise<void> {
     if (posterModal.isOpen) posterModal.close();
     else if (passportView.isOpen) passportView.close();
     else if (nowPlaying.visible) deselect();
-    else if (dareCard?.isExpanded) dareCard.collapse();
+    // The dare stays expanded during the walkthrough, so let Escape skip the
+    // path itself rather than collapse the card out from under it.
+    else if (dareCard?.isExpanded && !walkthrough?.active) dareCard.collapse();
+    else if (walkthrough?.active) walkthrough.skip();
   });
 
   const legend = el("legend");
@@ -228,7 +244,6 @@ async function start(): Promise<void> {
   el("passport-btn").hidden = false;
 
   hideSkeleton();
-  maybeShowOrientation();
 
   // The dare is computed once exemplars resolve so it can prefer a playable
   // neighbor. It never blocks the map, which is already interactive above.
@@ -250,6 +265,7 @@ async function start(): Promise<void> {
     onPlay: (genre, ex) => {
       setHook(genre, true, true);
       player.play(ex.previewUrl);
+      walkthrough?.noteAudio();
     },
     onStampDare: () => {
       const dare = getDare();
@@ -274,6 +290,25 @@ async function start(): Promise<void> {
   });
   dareCard.render();
   warmDare();
+
+  // The guided first run points at the dare card's real controls, so it is
+  // built last, once those anchors exist. It self-gates to a first visit.
+  walkthrough = new Walkthrough({
+    root: el("walkthrough"),
+    firstVisit,
+    startedLit: baselineLit > 0,
+    baselineLit,
+    anchors: {
+      starter: () => el("dare").querySelector<HTMLElement>(".dare-chip"),
+      darePlay: () => el("dare").querySelector<HTMLElement>(".dare-play"),
+      dareStamp: () =>
+        [...el("dare").querySelectorAll<HTMLElement>("button")].find(
+          (b) => b.textContent === "Stamp it",
+        ) ?? null,
+    },
+    expandDare: () => dareCard?.expand(),
+  });
+  walkthrough.start();
 
   let resizeTimer = 0;
   window.addEventListener("resize", () => {
