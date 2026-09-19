@@ -193,6 +193,19 @@ export function migratePassport(raw: unknown, mbidOnly = false): Passport {
   return emptyPassport();
 }
 
+// True when a passport was already in storage when the page loaded. Read
+// BEFORE resolveInitialPassport so a SEED_DEMO write never masks a genuine
+// first visit. Never throws when storage is unavailable.
+export function hasStoredPassport(): boolean {
+  const store = safeStorage();
+  if (!store) return false;
+  try {
+    return store.getItem(PASSPORT_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export function readPassport(): Passport | null {
   const store = safeStorage();
   if (!store) return null;
