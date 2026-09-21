@@ -23,5 +23,13 @@ export default defineConfig({
   },
   preview: {
     host: "127.0.0.1",
+    // Mirror the production nginx security headers so the preview surface
+    // (what the e2e suite serves) matches what ships. nginx.conf is the
+    // production source of truth; test/nginx-headers.test.ts guards it.
+    headers: {
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "Referrer-Policy": "strict-origin-when-cross-origin",
+    },
   },
 });
