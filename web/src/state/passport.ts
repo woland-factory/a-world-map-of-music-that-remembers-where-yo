@@ -418,7 +418,7 @@ export function buildSeedPassport(
 
 async function loadDemoNames(): Promise<string[]> {
   try {
-    const res = await fetch("/data/demo-passport.json", { cache: "no-store" });
+    const res = await fetch("/data/demo-passport.json");
     if (!res.ok) return [];
     const parsed = await res.json();
     return Array.isArray(parsed) ? (parsed as string[]) : [];

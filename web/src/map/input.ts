@@ -48,13 +48,25 @@ export function attachInput(
     }
   });
 
+  // Hover hit-testing is O(n) over ~2,200 nodes; coalesce it to at most one
+  // test per animation frame so a fast mousemove cannot spin the CPU.
+  let hoverX = 0;
+  let hoverY = 0;
+  let hoverFrame = 0;
+  const runHover = () => {
+    hoverFrame = 0;
+    const g = renderer.hitTest(hoverX, hoverY);
+    if (g) handlers.onWarm?.(g);
+  };
+
   canvas.addEventListener("pointermove", (e) => {
     // Hover (mouse, no active pointer): warm the preview under the cursor.
     if (pointers.size === 0) {
       if (e.pointerType === "mouse") {
         const p = local(e.clientX, e.clientY);
-        const g = renderer.hitTest(p.x, p.y);
-        if (g) handlers.onWarm?.(g);
+        hoverX = p.x;
+        hoverY = p.y;
+        if (!hoverFrame) hoverFrame = requestAnimationFrame(runHover);
       }
       return;
     }
@@ -135,6 +147,12 @@ export function attachInput(
       case "-":
       case "_":
         renderer.zoomBy(1 / 1.15, renderer.width / 2, renderer.height / 2);
+        break;
+      case "Enter":
+      case " ":
+        // Select the centre-most genre: aim with the pan/zoom keys above,
+        // then hear and stamp it without a pointer.
+        handlers.onSelect?.(renderer.nearestToCenter());
         break;
       default:
         return;

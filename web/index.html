@@ -11,6 +11,10 @@
       name="description"
       content="A map of every music genre. The places you explore light up."
     />
+    <!-- Start the largest download early so it overlaps module parse. No
+         crossorigin: this must match the same-origin fetch() in main.ts so
+         the browser reuses the one request instead of issuing a second. -->
+    <link rel="preload" href="/data/genres.json" as="fetch" />
     <!-- Runtime config. In the container the entrypoint regenerates this
          from environment variables before nginx starts. -->
     <script src="/env.js"></script>
@@ -18,6 +22,7 @@
   </head>
   <body>
     <main id="app">
+      <h1 class="sr-only">A world map of music</h1>
       <canvas
         id="map"
         role="img"
@@ -83,11 +88,14 @@
         </div>
       </section>
 
-      <!-- Now-playing panel: the selected genre, its track, and Stamp. -->
-      <section id="now-playing" class="now-playing" aria-live="polite" hidden>
+      <!-- Now-playing panel: the selected genre, its track, and Stamp. The
+           live region covers the text only, so the buttons never re-announce. -->
+      <section id="now-playing" class="now-playing" hidden>
         <button id="np-close" class="sheet-close" type="button" aria-label="Close">&times;</button>
-        <h2 id="np-title" class="np-title"></h2>
-        <p id="np-track" class="np-track"></p>
+        <div id="np-live" aria-live="polite">
+          <h2 id="np-title" class="np-title"></h2>
+          <p id="np-track" class="np-track"></p>
+        </div>
         <div class="np-actions">
           <button id="np-stamp" class="primary" type="button">Stamp</button>
           <span id="np-stamped" class="np-stamped" role="status" hidden></span>

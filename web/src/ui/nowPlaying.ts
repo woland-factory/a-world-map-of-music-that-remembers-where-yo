@@ -40,6 +40,12 @@ export class NowPlaying {
     this.panel.hidden = false;
   }
 
+  // A preview that failed to load gets a voice here instead of a silent dead
+  // end. Stamp stays available, so the genre is still keepable.
+  showPreviewError(): void {
+    this.track.textContent = "That preview didn't load. Tap another genre to hear it.";
+  }
+
   setStamped(stamped: boolean, date?: string): void {
     this.stampBtn.hidden = stamped;
     this.stampedTag.hidden = !stamped;

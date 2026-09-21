@@ -33,7 +33,9 @@ import { Walkthrough } from "./ui/walkthrough";
 import { initTelemetry } from "./telemetry";
 
 async function loadAtlas(): Promise<Atlas> {
-  const res = await fetch("/data/genres.json", { cache: "no-store" });
+  // Committed build artifact served with a short-lived Cache-Control, so a
+  // repeat visit revalidates instead of re-downloading the whole atlas.
+  const res = await fetch("/data/genres.json");
   if (!res.ok) throw new Error(`atlas ${res.status}`);
   const atlas = (await res.json()) as Atlas;
   if (!atlas.genres || atlas.genres.length === 0) throw new Error("empty atlas");
@@ -95,7 +97,6 @@ async function start(): Promise<void> {
   // Expose the renderer for end-to-end tests to read viewport state.
   (window as unknown as { __renderer?: MapRenderer }).__renderer = renderer;
 
-  const player = new Player();
   let selected: Genre | null = null;
 
   const setHook = (genre: Genre | null, hasPreview: boolean, playing: boolean): void => {
@@ -129,6 +130,14 @@ async function start(): Promise<void> {
       nowPlaying.setStamped(false);
     },
     onClose: () => deselect(),
+  });
+
+  // A failed preview gets the designed line in the panel, never a silent
+  // dead end, and only while its genre is still the open selection.
+  const player = new Player(undefined, {
+    onError: () => {
+      if (selected) nowPlaying.showPreviewError();
+    },
   });
 
   let passportView: PassportView;
@@ -197,6 +206,7 @@ async function start(): Promise<void> {
       return;
     }
     selected = genre;
+    renderer.setSelected(genre); // tactile answer on the canvas, within the tap
     const exemplar = getExemplar(exemplars, genre);
     nowPlaying.show(genre, exemplar, isStamped(genre.id), stampFor(genre.id)?.date);
     setHook(genre, !!exemplar, !!exemplar);
@@ -208,10 +218,24 @@ async function start(): Promise<void> {
 
   const deselect = (): void => {
     selected = null;
+    renderer.setSelected(null);
     nowPlaying.hide();
     player.stop();
     setHook(null, false, false);
   };
+
+  // A genre selected before exemplars finished loading shows the resting line.
+  // When its track arrives, refresh the panel to the real track so it never
+  // reads as permanently silent. Playback stays user-initiated (no auto-play).
+  void exemplarsPromise.then(() => {
+    if (!selected) return;
+    const ex = getExemplar(exemplars, selected);
+    if (!ex) return;
+    const hook = (window as unknown as { __nowPlaying?: NowPlayingHook }).__nowPlaying;
+    if (hook?.hasPreview) return; // already showing a real, playable track
+    nowPlaying.show(selected, ex, isStamped(selected.id), stampFor(selected.id)?.date);
+    setHook(selected, true, false);
+  });
 
   attachInput(canvas, renderer, {
     onSelect: (genre) => select(genre),

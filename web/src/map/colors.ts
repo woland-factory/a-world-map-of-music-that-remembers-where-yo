@@ -26,3 +26,5 @@ export function regionColor(region: number): string {
 // Dim base color for unlit dots on the dark field.
 export const UNLIT_COLOR = "#3a3f4b";
 export const BACKGROUND = "#0a0c10";
+// The interface accent, shared with --accent in style.css.
+export const ACCENT = "#4fc3f7";

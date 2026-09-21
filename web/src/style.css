@@ -1,7 +1,9 @@
 :root {
   --bg: #0a0c10;
   --panel: rgba(18, 22, 30, 0.92);
-  --border: rgba(148, 163, 184, 0.22);
+  /* Opaque enough that control outlines clear the 3:1 WCAG 1.4.11 non-text
+     minimum against the panel background, while keeping the dark look. */
+  --border: rgba(148, 163, 184, 0.6);
   --text: #e2e8f0;
   --muted: #94a3b8;
   --accent: #4fc3f7;
@@ -10,6 +12,20 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* Visually hidden, still in the accessibility tree (the page heading). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* The hidden attribute must win over the display rules below. */
@@ -269,6 +285,7 @@ button.primary:hover {
   text-transform: uppercase;
   cursor: pointer;
   padding: 4px 2px;
+  min-height: 44px;
   width: 100%;
   text-align: left;
 }

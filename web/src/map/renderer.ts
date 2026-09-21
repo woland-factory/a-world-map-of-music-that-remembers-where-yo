@@ -1,5 +1,5 @@
 import type { Atlas, Genre } from "../types";
-import { BACKGROUND } from "./colors";
+import { ACCENT, BACKGROUND } from "./colors";
 import { computeRenderGenres, type RenderGenre } from "./lit";
 
 const TAP_RADIUS = 14; // comfortable touch target around a genre node
@@ -24,6 +24,7 @@ export class MapRenderer {
   vp: Viewport = { scale: 1, offsetX: 0, offsetY: 0 };
   fitScale = 1;
   private frame = 0;
+  private selectedId: number | null = null;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -62,6 +63,21 @@ export class MapRenderer {
   setLit(lit: Set<number>): void {
     this.render = computeRenderGenres(this.atlas, lit);
     this.requestDraw();
+  }
+
+  // Mark one genre as selected (or clear) and repaint so a tapped node shows
+  // an accent ring. Feedback only: the ring is static, drawn on change.
+  setSelected(genre: Genre | null): void {
+    const next = genre ? genre.id : null;
+    if (next === this.selectedId) return;
+    this.selectedId = next;
+    this.requestDraw();
+  }
+
+  // The currently selected genre id, exposed for end-to-end tests to read the
+  // tactile-feedback state without inspecting pixels.
+  get selected(): number | null {
+    return this.selectedId;
   }
 
   resize(): void {
@@ -160,6 +176,26 @@ export class MapRenderer {
     return best;
   }
 
+  // The genre nearest the viewport centre, or null when the map is empty.
+  // Powers the keyboard core action: aim with pan/zoom, then select the
+  // centre-most node. A linear scan is well under a frame.
+  nearestToCenter(): Genre | null {
+    const cx = this.cssW / 2;
+    const cy = this.cssH / 2;
+    let best: Genre | null = null;
+    let bestDist = Infinity;
+    for (const r of this.render) {
+      const dx = this.toScreenX(r.genre.x) - cx;
+      const dy = this.toScreenY(r.genre.y) - cy;
+      const d = dx * dx + dy * dy;
+      if (d < bestDist) {
+        bestDist = d;
+        best = r.genre;
+      }
+    }
+    return best;
+  }
+
   requestDraw(): void {
     if (this.frame) return;
     this.frame = requestAnimationFrame(() => {
@@ -187,8 +223,26 @@ export class MapRenderer {
       this.drawDot(r, dotBase + 1.2, true);
     }
 
+    if (this.selectedId !== null) this.drawSelectedRing();
+
     if (ratio < LABEL_RATIO) this.drawRegionLabels();
     else this.drawGenreLabels();
+  }
+
+  // A single accent ring around the selected node: the tap's answer on the
+  // map. Static (no animation), independent of audio decode.
+  private drawSelectedRing(): void {
+    const r = this.render.find((g) => g.genre.id === this.selectedId);
+    if (!r) return;
+    const sx = this.toScreenX(r.genre.x);
+    const sy = this.toScreenY(r.genre.y);
+    if (sx < -20 || sx > this.cssW + 20 || sy < -20 || sy > this.cssH + 20) return;
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 9, 0, Math.PI * 2);
+    ctx.strokeStyle = ACCENT;
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
 
   private drawDot(r: RenderGenre, radius: number, glow: boolean): void {

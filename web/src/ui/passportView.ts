@@ -1,6 +1,7 @@
 import type { Atlas, Genre, Passport } from "../types";
 import { regionColor } from "../map/colors";
 import { FILL_MESSAGES, type FillResult } from "../state/listenbrainz";
+import { trapTab } from "./focusTrap";
 
 const APPROX_TOTAL = "~2,200";
 
@@ -64,6 +65,7 @@ export class PassportView {
     root.getElementById("poster-open")!.addEventListener("click", () => this.deps.onPoster());
     this.sheet.addEventListener("keydown", (e) => {
       if (e.key === "Escape") this.close();
+      else trapTab(this.sheet, e);
     });
 
     this.refresh();

@@ -5,7 +5,7 @@ import type { Exemplar, ExemplarIndex, ExemplarsFile, Genre } from "../types";
 export async function loadExemplars(): Promise<ExemplarIndex> {
   const index: ExemplarIndex = new Map();
   try {
-    const res = await fetch("/data/exemplars.json", { cache: "no-store" });
+    const res = await fetch("/data/exemplars.json");
     if (!res.ok) return index;
     const file = (await res.json()) as ExemplarsFile;
     for (const [mbid, ex] of Object.entries(file.exemplars ?? {})) {

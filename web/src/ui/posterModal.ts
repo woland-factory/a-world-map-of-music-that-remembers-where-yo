@@ -4,6 +4,7 @@
 
 import type { Atlas } from "../types";
 import { makePosterBlob, posterDateLine } from "../poster/poster";
+import { trapTab } from "./focusTrap";
 
 export interface PosterModalDeps {
   atlas: Atlas;
@@ -36,6 +37,9 @@ export class PosterModal {
 
     this.closeBtn.addEventListener("click", () => this.close());
     this.downloadBtn.addEventListener("click", () => this.download());
+    // Contain Tab within the modal while it sits above the passport sheet.
+    // Escape still closes it first, handled by the global key handler.
+    this.modal.addEventListener("keydown", (e) => trapTab(this.modal, e));
   }
 
   get isOpen(): boolean {

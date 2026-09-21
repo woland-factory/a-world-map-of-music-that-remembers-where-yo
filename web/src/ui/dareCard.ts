@@ -76,7 +76,10 @@ export class DareCard {
     else if (p.dare.done) this.renderDone();
     else this.renderDare();
 
-    this.root.hidden = false;
+    // Never show an empty panel. When nothing designed resolved (e.g. a dare
+    // whose genre is missing from the atlas), stay hidden rather than flash a
+    // blank card with no copy and no exit.
+    this.root.hidden = this.content.childElementCount === 0;
   }
 
   private renderStarter(): void {
