@@ -8,6 +8,13 @@ function fakeAudio() {
     preload: "",
     plays: [] as string[],
     pauses: 0,
+    listeners: {} as Record<string, () => void>,
+    addEventListener(type: string, fn: () => void) {
+      this.listeners[type] = fn;
+    },
+    fireError() {
+      this.listeners.error?.();
+    },
     play() {
       this.plays.push(this.src);
       return Promise.resolve();
@@ -58,5 +65,31 @@ describe("audio player", () => {
     const p = new Player(el as unknown as AudioLike);
     p.stop();
     expect(el.pauses).toBe(1);
+  });
+
+  it("reports a load failure only for a clip the user asked to hear", async () => {
+    const el = fakeAudio();
+    let errors = 0;
+    const p = new Player(el as unknown as AudioLike, { onError: () => errors++ });
+
+    // A warm that fails to load is not a request to hear it: stay silent.
+    p.warm("https://audio/warm.m4a");
+    el.fireError();
+    expect(errors).toBe(0);
+
+    // A play that fails surfaces the error once.
+    await p.play("https://audio/bad.m4a");
+    el.fireError();
+    expect(errors).toBe(1);
+  });
+
+  it("stops treating a clip as playing after stop, so a late error stays silent", async () => {
+    const el = fakeAudio();
+    let errors = 0;
+    const p = new Player(el as unknown as AudioLike, { onError: () => errors++ });
+    await p.play("https://audio/one.m4a");
+    p.stop();
+    el.fireError();
+    expect(errors).toBe(0);
   });
 });

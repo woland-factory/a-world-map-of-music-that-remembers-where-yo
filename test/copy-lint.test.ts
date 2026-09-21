@@ -5,6 +5,24 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
+// The region labels the app renders into #legend-list: read from the
+// committed atlas, selected exactly as web/src/map/legend.ts does (regions
+// with at least four genres, biggest first, capped). A voice defect in a
+// rendered region name is then caught by the same sweep.
+function regionLabels(): string[] {
+  const atlas = JSON.parse(readFileSync(join(ROOT, "data", "genres.json"), "utf8")) as {
+    regions: { id: number; label: string }[];
+    genres: { region: number }[];
+  };
+  const counts = new Map<number, number>();
+  for (const g of atlas.genres) counts.set(g.region, (counts.get(g.region) ?? 0) + 1);
+  return atlas.regions
+    .filter((r) => (counts.get(r.id) ?? 0) >= 4)
+    .sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0))
+    .slice(0, 12)
+    .map((r) => r.label);
+}
+
 // Every user-visible string. index.html carries most of it; dynamic
 // strings built in TS are listed explicitly so the sweep sees them.
 function visibleCopy(): string {
@@ -37,6 +55,7 @@ function visibleCopy(): string {
     "3-day streak", // streak line (hyphen allowed)
     "Frontier moved.", // done heading
     "You crossed into techno.", // done body
+    "a new sound", // done-body fallback when the genre name is missing
     "New dare tomorrow.", // done note
     "See your map", // done / no-frontier action
     "You reached every neighbor.", // no-frontier heading
@@ -70,8 +89,10 @@ function visibleCopy(): string {
     "412 of 2,197 genres lit", // poster count line
     "September 15, 2026 · music.example.org", // poster footer (middot separator)
     "The poster didn't print. Close this and try again.", // toBlob failure
+    // Now-playing audio failure (built in ui/nowPlaying.ts).
+    "That preview didn't load. Tap another genre to hear it.",
   ];
-  return html + "\n" + dynamic.join("\n");
+  return html + "\n" + dynamic.join("\n") + "\n" + regionLabels().join("\n");
 }
 
 const BANNED = [
@@ -87,12 +108,17 @@ const BANNED = [
   "we've got you covered",
 ];
 
+// Curated negative-phrase list. Deliberately specific: a bare "no " or
+// "nothing " substring false-positives on words like "piano" or "no-store",
+// so each phrase names an actual empty/error voice we ban.
 const NEGATIVE = [
   "you don't have",
-  "no ",
-  "nothing ",
   "unable to",
   "something went wrong",
+  "you have no",
+  "nothing here",
+  "no stamps",
+  "no genres",
 ];
 
 describe("copy sweep (product voice)", () => {
@@ -114,9 +140,8 @@ describe("copy sweep (product voice)", () => {
     // Check inside human-readable text nodes only, to avoid matching
     // attributes like rel="no-referrer". We scan the rendered words.
     const words = lower.replace(/<[^>]+>/g, " ");
-    for (const phrase of ["you don't have", "no genres", "nothing here", "unable to", "something went wrong"]) {
+    for (const phrase of NEGATIVE) {
       expect(words.includes(phrase)).toBe(false);
     }
-    void NEGATIVE;
   });
 });
